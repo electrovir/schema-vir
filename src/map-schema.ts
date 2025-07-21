@@ -49,7 +49,7 @@ export type SchemaShapeOptions = FromSchemaOptions &
 export type SchemaShapeToType<
     Schema extends JSONSchema,
     Options extends SchemaShapeOptions,
-> = FromSchema<MapSchema<Schema, Options>, Options>;
+> = FromSchema<Extract<MapSchema<Schema, Options>, JSONSchema>, Options>;
 
 /**
  * Maps the schema to inject some extra properties so that `json-schema-to-ts` will transform it the
@@ -62,44 +62,28 @@ export type MapSchema<
     Options extends SchemaShapeOptions,
 > = Schema extends AnyObject
     ? Schema['type'] extends 'object'
-        ? (Options['allowAdditionalProperties'] extends true
-              ? Schema
-              : Overwrite<
-                    Schema,
-                    {
-                        properties: Readonly<{
-                            [Key in keyof Schema['properties']]: MapSchema<
-                                Schema['properties'][Key],
-                                Options
-                            >;
-                        }>;
-                        additionalProperties: false;
-                    }
-                >) &
-              (Options['allRequired'] extends true
-                  ? Overwrite<
-                        Schema,
-                        {
-                            required: (keyof Schema['properties'])[];
-                        }
-                    >
-                  : Schema)
+        ? Omit<Schema, 'properties' | 'additionalProperties' | 'required'> & {
+              properties: Readonly<{
+                  [Key in keyof Schema['properties']]: MapSchema<
+                      Schema['properties'][Key],
+                      Options
+                  >;
+              }>;
+              required: Options['allRequired'] extends true
+                  ? (keyof Schema['properties'])[]
+                  : Schema['required'];
+              additionalProperties: Options['allowAdditionalProperties'] extends true
+                  ? true
+                  : false;
+          }
         : Schema['type'] extends 'array'
-          ? Options['allowAdditionalProperties'] extends true
-              ? Schema
-              : Overwrite<
-                    Schema,
-                    {
-                        items: Schema['items'] extends ReadonlyArray<any>
-                            ? Readonly<{
-                                  [Key in keyof Schema['items']]: MapSchema<
-                                      Schema['items'][Key],
-                                      Options
-                                  >;
-                              }>
-                            : MapSchema<Schema['items'], Options>;
-                    }
-                >
+          ? Omit<Schema, 'items'> & {
+                items: Schema['items'] extends ReadonlyArray<any>
+                    ? Readonly<{
+                          [Key in keyof Schema['items']]: MapSchema<Schema['items'][Key], Options>;
+                      }>
+                    : MapSchema<Schema['items'], Options>;
+            }
           : Schema
     : Schema;
 

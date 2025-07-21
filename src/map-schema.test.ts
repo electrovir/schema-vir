@@ -300,7 +300,9 @@ describe(mapSchemaToShape.name, () => {
                     },
                 },
             },
-            {allRequired: true},
+            {
+                allRequired: true,
+            },
         );
 
         assertValidShape(value, schemaShape);
