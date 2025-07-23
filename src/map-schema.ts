@@ -16,7 +16,12 @@ import {
 } from 'json-schema-to-ts';
 import {defineShape, exact, optional, or, type ShapeDefinition} from 'object-shape-tester';
 
-export type {FromSchema, FromSchemaOptions} from 'json-schema-to-ts';
+export type {
+    FromSchema,
+    FromSchemaDefaultOptions,
+    FromSchemaOptions,
+    JSONSchema,
+} from 'json-schema-to-ts';
 
 /**
  * Options for {@link mapSchemaToShape}.
