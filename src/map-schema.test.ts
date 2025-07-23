@@ -319,4 +319,46 @@ describe(mapSchemaToShape.name, () => {
             };
         }>();
     });
+
+    it('works without required fields', () => {
+        const schemaShape = mapSchemaToShape({
+            $schema: 'http://json-schema.org/draft-07/schema#',
+            type: 'object',
+            required: [
+                'topProp',
+            ],
+            properties: {
+                topProp: {
+                    type: 'object',
+                    required: [
+                        'secondProp',
+                    ],
+                    properties: {
+                        secondProp: {
+                            type: 'object',
+                            properties: {
+                                thirdProp: {
+                                    type: 'array',
+                                    items: {
+                                        type: 'object',
+                                        required: [
+                                            'threeA',
+                                        ],
+                                        properties: {
+                                            threeA: {
+                                                type: 'string',
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        assert.tsType<typeof schemaShape.runtimeType.topProp.secondProp>().notEquals<unknown>();
+        assert.tsType<typeof schemaShape.runtimeType.topProp.secondProp>().equals<{}>();
+    });
 });
