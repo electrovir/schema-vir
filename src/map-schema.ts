@@ -8,7 +8,12 @@ import {
     stringify,
     typedMap,
 } from '@augment-vir/common';
-import {type FromSchema, type FromSchemaOptions, type JSONSchema} from 'json-schema-to-ts';
+import {
+    type FromSchema,
+    type FromSchemaDefaultOptions,
+    type FromSchemaOptions,
+    type JSONSchema,
+} from 'json-schema-to-ts';
 import {defineShape, exact, optional, or, type ShapeDefinition} from 'object-shape-tester';
 
 export type {FromSchema, FromSchemaOptions} from 'json-schema-to-ts';
@@ -62,20 +67,30 @@ export type MapSchema<
     Options extends SchemaShapeOptions,
 > = Schema extends AnyObject
     ? Schema['type'] extends 'object'
-        ? Omit<Schema, 'properties' | 'additionalProperties' | 'required'> & {
-              properties: Readonly<{
-                  [Key in keyof Schema['properties']]: MapSchema<
-                      Schema['properties'][Key],
-                      Options
-                  >;
-              }>;
-              required: Options['allRequired'] extends true
-                  ? (keyof Schema['properties'])[]
-                  : Schema['required'];
-              additionalProperties: Options['allowAdditionalProperties'] extends true
-                  ? true
-                  : false;
-          }
+        ? Options['allRequired'] extends true
+            ? Omit<Schema, 'properties' | 'additionalProperties' | 'required'> & {
+                  properties: Readonly<{
+                      [Key in keyof Schema['properties']]: MapSchema<
+                          Schema['properties'][Key],
+                          Options
+                      >;
+                  }>;
+                  required: (keyof Schema['properties'])[];
+                  additionalProperties: Options['allowAdditionalProperties'] extends true
+                      ? true
+                      : false;
+              }
+            : Omit<Schema, 'properties' | 'additionalProperties'> & {
+                  properties: Readonly<{
+                      [Key in keyof Schema['properties']]: MapSchema<
+                          Schema['properties'][Key],
+                          Options
+                      >;
+                  }>;
+                  additionalProperties: Options['allowAdditionalProperties'] extends true
+                      ? true
+                      : false;
+              }
         : Schema['type'] extends 'array'
           ? Omit<Schema, 'items'> & {
                 items: Schema['items'] extends ReadonlyArray<any>
@@ -114,7 +129,7 @@ export type SchemaShape<Schema extends JSONSchema, Options extends SchemaShapeOp
  */
 export function mapSchemaToShape<
     const Schema extends JSONSchema,
-    const Options extends SchemaShapeOptions,
+    const Options extends SchemaShapeOptions = FromSchemaDefaultOptions,
 >(rawSchema: Schema, options?: Options): SchemaShape<Schema, Options> {
     return defineShape(
         recursiveSchemaToShape(rawSchema, []),

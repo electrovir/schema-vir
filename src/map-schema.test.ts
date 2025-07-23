@@ -359,6 +359,10 @@ describe(mapSchemaToShape.name, () => {
         });
 
         assert.tsType<typeof schemaShape.runtimeType.topProp.secondProp>().notEquals<unknown>();
-        assert.tsType<typeof schemaShape.runtimeType.topProp.secondProp>().equals<{}>();
+        assert.tsType<typeof schemaShape.runtimeType.topProp.secondProp>().equals<{
+            thirdProp?: {
+                threeA: string;
+            }[];
+        }>();
     });
 });
