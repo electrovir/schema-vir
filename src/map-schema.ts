@@ -62,7 +62,12 @@ export type SchemaShapeToType<
     Options extends SchemaShapeOptions,
 > = FromSchema<Extract<MapSchema<Schema, Options>, JSONSchema>, Options>;
 
-type FixDefs<Schema, Options extends SchemaShapeOptions> = Schema extends {
+/**
+ * Maps the schema for definitions.
+ *
+ * @category Internal
+ */
+export type FixDefs<Schema, Options extends SchemaShapeOptions> = Schema extends {
     $defs: infer Defs extends Record<string, JSONSchema>;
 }
     ? Omit<Schema, '$defs'> & {

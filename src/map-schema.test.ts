@@ -376,6 +376,23 @@ describe(mapSchemaToShape.name, () => {
         });
     });
 
+    it('fails on invalid definition', () => {
+        assert.throws(() =>
+            mapSchemaToShape({
+                $schema: 'http://json-schema.org/draft-07/schema#',
+                type: 'object',
+                properties: {
+                    usesDef: {
+                        type: 'array',
+                        items: {
+                            $ref: '#/$defs/invalid',
+                        },
+                    },
+                },
+            }),
+        );
+    });
+
     it('works without required fields', () => {
         const schemaShape = mapSchemaToShape({
             $schema: 'http://json-schema.org/draft-07/schema#',
