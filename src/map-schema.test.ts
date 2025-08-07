@@ -320,6 +320,62 @@ describe(mapSchemaToShape.name, () => {
         }>();
     });
 
+    it('works on definitions', () => {
+        const withDefs = mapSchemaToShape({
+            $schema: 'http://json-schema.org/draft-07/schema#',
+            type: 'object',
+            required: [
+                'basic',
+                'usesDef',
+            ],
+            $defs: {
+                item: {
+                    type: 'object',
+                    required: [
+                        'text',
+                    ],
+                    properties: {
+                        text: {
+                            type: 'string',
+                        },
+                        page_numbers: {
+                            type: 'array',
+                            items: {
+                                type: 'integer',
+                            },
+                        },
+                    },
+                },
+            },
+            properties: {
+                basic: {
+                    type: 'string',
+                },
+                usesDef: {
+                    type: 'array',
+                    items: {
+                        $ref: '#/$defs/item',
+                    },
+                },
+            },
+        });
+
+        assert.tsType<typeof withDefs.runtimeType>().equals<{
+            basic: string;
+            usesDef: {text: string; page_numbers?: number[]}[];
+        }>();
+
+        assert.deepEquals(withDefs.defaultValue, {
+            basic: '',
+            usesDef: [
+                {
+                    text: '',
+                    page_numbers: [-1],
+                },
+            ],
+        });
+    });
+
     it('works without required fields', () => {
         const schemaShape = mapSchemaToShape({
             $schema: 'http://json-schema.org/draft-07/schema#',

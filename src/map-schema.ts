@@ -5,6 +5,7 @@ import {
     mapObjectValues,
     type Overwrite,
     type PartialWithUndefined,
+    removePrefix,
     stringify,
     typedMap,
 } from '@augment-vir/common';
@@ -61,13 +62,33 @@ export type SchemaShapeToType<
     Options extends SchemaShapeOptions,
 > = FromSchema<Extract<MapSchema<Schema, Options>, JSONSchema>, Options>;
 
+type FixDefs<Schema, Options extends SchemaShapeOptions> = Schema extends {
+    $defs: infer Defs extends Record<string, JSONSchema>;
+}
+    ? Omit<Schema, '$defs'> & {
+          $defs: {
+              [DefKey in keyof Defs]: MapSchemaInternal<Defs[DefKey], Options>;
+          };
+      }
+    : Schema;
+
 /**
  * Maps the schema to inject some extra properties so that `json-schema-to-ts` will transform it the
  * way we want it to.
  *
  * @category Internal
  */
-export type MapSchema<
+export type MapSchema<Schema extends JSONSchema, Options extends SchemaShapeOptions> = FixDefs<
+    MapSchemaInternal<Schema, Options>,
+    Options
+>;
+
+/**
+ * Inner workings of {@link MapSchema} without fixing definitions.
+ *
+ * @category Internal
+ */
+export type MapSchemaInternal<
     Schema extends JSONSchema,
     Options extends SchemaShapeOptions,
 > = Schema extends AnyObject
@@ -137,7 +158,7 @@ export function mapSchemaToShape<
     const Options extends SchemaShapeOptions = FromSchemaDefaultOptions,
 >(rawSchema: Schema, options?: Options): SchemaShape<Schema, Options> {
     return defineShape(
-        recursiveSchemaToShape(rawSchema, []),
+        recursiveSchemaToShape(rawSchema, [], {}),
         options?.isReadonly,
     ) satisfies ShapeDefinition<any, any> as any as SchemaShape<Schema, Options>;
 }
@@ -145,6 +166,7 @@ export function mapSchemaToShape<
 function recursiveSchemaToShape(
     rawSchema: JSONSchema | ReadonlyArray<JSONSchema>,
     keyChain: (string | number)[],
+    parentDefinitions: Record<string, unknown>,
 ): any {
     const keyChainString = keyChain.length ? keyChain.join('>') : 'Top level';
 
@@ -157,18 +179,44 @@ function recursiveSchemaToShape(
             assert.isLengthAtLeast(schema, 1, 'Schema array is empty.');
             return or(
                 ...typedMap(schema, (entry, index) =>
-                    recursiveSchemaToShape(entry, [
-                        ...keyChain,
-                        index,
-                    ]),
+                    recursiveSchemaToShape(
+                        entry,
+                        [
+                            ...keyChain,
+                            index,
+                        ],
+                        parentDefinitions,
+                    ),
                 ),
             );
-        } else if (schema.type === 'array') {
+        }
+
+        const newDefinitions =
+            '$defs' in schema
+                ? mapObjectValues(schema.$defs as AnyObject, (key, value) => {
+                      return recursiveSchemaToShape(
+                          value,
+                          [
+                              ...keyChain,
+                              '$defs',
+                              String(key),
+                          ],
+                          parentDefinitions,
+                      ) as AnyObject;
+                  })
+                : {};
+
+        const definitions = {
+            ...parentDefinitions,
+            ...newDefinitions,
+        };
+
+        if (schema.type === 'array') {
             if (!schema.items) {
                 throw new Error('Got an array without items.');
             }
 
-            return [recursiveSchemaToShape(schema.items, keyChain)];
+            return [recursiveSchemaToShape(schema.items, keyChain, definitions)];
         } else if (schema.type === 'object') {
             if (!schema.properties) {
                 throw new Error('Got an object without properties.');
@@ -178,10 +226,14 @@ function recursiveSchemaToShape(
             return mapObjectValues(schema.properties, (key, propertyValue) => {
                 const isPropertyOptional = !requiredProperties.includes(key);
 
-                const propertyShape = recursiveSchemaToShape(propertyValue, [
-                    ...keyChain,
-                    key,
-                ]);
+                const propertyShape = recursiveSchemaToShape(
+                    propertyValue,
+                    [
+                        ...keyChain,
+                        key,
+                    ],
+                    definitions,
+                );
 
                 if (isPropertyOptional) {
                     return optional(or(propertyShape, undefined));
@@ -209,6 +261,16 @@ function recursiveSchemaToShape(
             return null;
         } else if (schema.type === 'string') {
             return schema.default ?? '';
+        } else if (schema.$ref) {
+            const refKey = removePrefix({value: schema.$ref, prefix: '#/$defs/'});
+
+            const definition = definitions[refKey];
+
+            if (definition) {
+                return definition;
+            } else {
+                throw new Error(`No definition found for '${schema.$ref}'`);
+            }
         } else {
             throw new Error(`Unexpected schema: ${stringify(schema)}`);
         }
