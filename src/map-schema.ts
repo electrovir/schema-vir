@@ -15,7 +15,7 @@ import {
     type FromSchemaOptions,
     type JSONSchema,
 } from 'json-schema-to-ts';
-import {defineShape, exact, optional, or, type ShapeDefinition} from 'object-shape-tester';
+import {defineShape, exactShape, optionalShape, type Shape, unionShape} from 'object-shape-tester';
 
 export type {
     FromSchema,
@@ -32,24 +32,12 @@ export type {
 export type SchemaShapeOptions = FromSchemaOptions &
     PartialWithUndefined<{
         /**
-         * Sets types as readonly.
-         *
-         * @default false
-         */
-        isReadonly: boolean;
-        /**
          * Allows additional properties in the schema. By default, (when this is `false`) additional
          * properties are suppressed (additional properties are a `json-schema-to-ts` feature).
          *
          * @default false
          */
         allowAdditionalProperties: boolean;
-        /**
-         * Automatically make all properties required.
-         *
-         * @default false
-         */
-        allRequired: boolean;
     }>;
 
 /**
@@ -98,30 +86,17 @@ export type MapSchemaInternal<
     Options extends SchemaShapeOptions,
 > = Schema extends AnyObject
     ? Schema['type'] extends 'object'
-        ? Options['allRequired'] extends true
-            ? Omit<Schema, 'properties' | 'additionalProperties' | 'required'> & {
-                  properties: Readonly<{
-                      [Key in keyof Schema['properties']]: MapSchema<
-                          Schema['properties'][Key],
-                          Options
-                      >;
-                  }>;
-                  required: (keyof Schema['properties'])[];
-                  additionalProperties: Options['allowAdditionalProperties'] extends true
-                      ? true
-                      : false;
-              }
-            : Omit<Schema, 'properties' | 'additionalProperties'> & {
-                  properties: Readonly<{
-                      [Key in keyof Schema['properties']]: MapSchema<
-                          Schema['properties'][Key],
-                          Options
-                      >;
-                  }>;
-                  additionalProperties: Options['allowAdditionalProperties'] extends true
-                      ? true
-                      : false;
-              }
+        ? Omit<Schema, 'properties' | 'additionalProperties'> & {
+              properties: Readonly<{
+                  [Key in keyof Schema['properties']]: MapSchema<
+                      Schema['properties'][Key],
+                      Options
+                  >;
+              }>;
+              additionalProperties: Options['allowAdditionalProperties'] extends true
+                  ? true
+                  : false;
+          }
         : Schema['type'] extends 'array'
           ? Omit<Schema, 'items'> & {
                 items: Schema['items'] extends ReadonlyArray<any>
@@ -141,19 +116,16 @@ export type MapSchemaInternal<
 export type SchemaShape<Schema extends JSONSchema, Options extends SchemaShapeOptions> =
     SchemaShapeToType<Schema, Options> extends infer ShapeType
         ? Overwrite<
-              ShapeDefinition<
-                  any,
-                  Options['isReadonly'] extends boolean ? Options['isReadonly'] : false
-              >,
+              Shape,
               {
                   runtimeType: ShapeType;
-                  defaultValue: ShapeType;
+                  default: ShapeType;
               }
           >
         : never;
 
 /**
- * Maps a schema object to a `ShapeDefinition` which can be used with the
+ * Maps a schema object to a `Shape` which can be used with the
  * [object-shape-tester](https://www.npmjs.com/package/object-shape-tester) package.
  *
  * @category Main
@@ -161,11 +133,11 @@ export type SchemaShape<Schema extends JSONSchema, Options extends SchemaShapeOp
 export function mapSchemaToShape<
     const Schema extends JSONSchema,
     const Options extends SchemaShapeOptions = FromSchemaDefaultOptions,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
 >(rawSchema: Schema, options?: Options): SchemaShape<Schema, Options> {
     return defineShape(
         recursiveSchemaToShape(rawSchema, [], {}),
-        options?.isReadonly,
-    ) satisfies ShapeDefinition<any, any> as any as SchemaShape<Schema, Options>;
+    ) satisfies Shape as any as SchemaShape<Schema, Options>;
 }
 
 function recursiveSchemaToShape(
@@ -182,7 +154,7 @@ function recursiveSchemaToShape(
             throw new TypeError('A raw boolean schema is not supported.');
         } else if (check.isArray(schema)) {
             assert.isLengthAtLeast(schema, 1, 'Schema array is empty.');
-            return or(
+            return unionShape(
                 ...typedMap(schema, (entry, index) =>
                     recursiveSchemaToShape(
                         entry,
@@ -241,13 +213,13 @@ function recursiveSchemaToShape(
                 );
 
                 if (isPropertyOptional) {
-                    return optional(or(propertyShape, undefined));
+                    return optionalShape(unionShape(propertyShape, undefined));
                 } else {
                     return propertyShape;
                 }
             });
         } else if (schema.const) {
-            return exact(schema.const);
+            return exactShape(schema.const);
         } else if (schema.enum) {
             if (!check.isArray(schema.enum)) {
                 throw new TypeError('Got a non array enum.');
@@ -257,7 +229,7 @@ function recursiveSchemaToShape(
                 throw new Error('Got a non primitive enum value.');
             }
 
-            return or(...typedMap(schema.enum, (value) => exact(value)));
+            return unionShape(...typedMap(schema.enum, (value) => exactShape(value)));
         } else if (schema.type === 'boolean') {
             return schema.default ?? false;
         } else if (schema.type === 'integer' || schema.type === 'number') {

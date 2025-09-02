@@ -1,6 +1,12 @@
 import {assert} from '@augment-vir/assert';
 import {describe, it, itCases} from '@augment-vir/test';
-import {assertValidShape, defineShape, exact, optional, or} from 'object-shape-tester';
+import {
+    assertValidShape,
+    defineShape,
+    exactShape,
+    optionalShape,
+    unionShape,
+} from 'object-shape-tester';
 import {mapSchemaToShape, type SchemaShapeOptions} from './map-schema.js';
 
 /** Test mock schema validity here: https://borischerny.com/json-schema-to-typescript-browser */
@@ -43,9 +49,12 @@ describe(mapSchemaToShape.name, () => {
             expect: defineShape({
                 firstName: '',
                 lastName: '',
-                age: optional(or(-1, undefined)),
-                hairColor: optional(
-                    or(or(exact('black'), exact('brown'), exact('blue')), undefined),
+                age: optionalShape(unionShape(-1, undefined)),
+                hairColor: optionalShape(
+                    unionShape(
+                        unionShape(exactShape('black'), exactShape('brown'), exactShape('blue')),
+                        undefined,
+                    ),
                 ),
             }),
         },
@@ -155,20 +164,16 @@ describe(mapSchemaToShape.name, () => {
                         },
                     },
                 },
-                {isReadonly: true},
             ],
-            expect: defineShape(
-                {
-                    isNull: optional(or(null, undefined)),
-                    isInt: optional(or(-1, undefined)),
-                    isNumber: optional(or(-1, undefined)),
-                    isBooleanWithDefault: optional(or(true, undefined)),
-                    isBooleanWithoutDefault: optional(or(false, undefined)),
-                    isConst: optional(or(exact('five'), undefined)),
-                    isArray: optional(or([or('', -1)], undefined)),
-                },
-                true as any,
-            ),
+            expect: defineShape({
+                isNull: optionalShape(unionShape(null, undefined)),
+                isInt: optionalShape(unionShape(-1, undefined)),
+                isNumber: optionalShape(unionShape(-1, undefined)),
+                isBooleanWithDefault: optionalShape(unionShape(true, undefined)),
+                isBooleanWithoutDefault: optionalShape(unionShape(false, undefined)),
+                isConst: optionalShape(unionShape(exactShape('five'), undefined)),
+                isArray: optionalShape(unionShape([unionShape('', -1)], undefined)),
+            }),
         },
     ]);
 
@@ -249,77 +254,6 @@ describe(mapSchemaToShape.name, () => {
         }>();
     });
 
-    it('can make all properties required', () => {
-        const value = {
-            firstName: 'first',
-            lastName: 'last',
-        } as unknown;
-
-        const schemaShape = mapSchemaToShape(
-            {
-                title: 'Example Schema',
-                type: 'object',
-                properties: {
-                    firstName: {
-                        type: 'string',
-                    },
-                    lastName: {
-                        type: 'string',
-                    },
-                    age: {
-                        description: 'Age in years',
-                        type: 'integer',
-                        minimum: 0,
-                    },
-                    hairColor: {
-                        enum: [
-                            'black',
-                            'brown',
-                            'blue',
-                        ],
-                        type: 'string',
-                    },
-                    nested: {
-                        type: 'object',
-                        properties: {
-                            nestedA: {
-                                type: 'string',
-                            },
-                            nestedB: {
-                                type: 'array',
-                                items: {
-                                    type: 'object',
-                                    properties: {
-                                        nestedArrayItem: {
-                                            type: 'string',
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-            {
-                allRequired: true,
-            },
-        );
-
-        assertValidShape(value, schemaShape);
-
-        assert.tsType(value).equals<{
-            firstName: string;
-            lastName: string;
-            age: number;
-            hairColor: 'black' | 'brown' | 'blue';
-            nested: {
-                nestedA: string;
-
-                nestedB: {nestedArrayItem: string}[];
-            };
-        }>();
-    });
-
     it('works on definitions', () => {
         const withDefs = mapSchemaToShape({
             $schema: 'http://json-schema.org/draft-07/schema#',
@@ -365,14 +299,9 @@ describe(mapSchemaToShape.name, () => {
             usesDef: {text: string; page_numbers?: number[]}[];
         }>();
 
-        assert.deepEquals(withDefs.defaultValue, {
+        assert.deepEquals(withDefs.default, {
             basic: '',
-            usesDef: [
-                {
-                    text: '',
-                    page_numbers: [-1],
-                },
-            ],
+            usesDef: [],
         });
     });
 
