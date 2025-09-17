@@ -319,6 +319,127 @@ describe(mapSchemaToShape.name, () => {
             withDefs,
         );
     });
+    it('handles nested definitions', () => {
+        const withDefs = mapSchemaToShape({
+            $schema: 'http://json-schema.org/draft-07/schema#',
+            type: 'object',
+            required: [
+                'basic',
+                'usesDef',
+            ],
+            $defs: {
+                item: {
+                    type: 'object',
+                    required: [
+                        'text',
+                    ],
+                    properties: {
+                        text: {
+                            type: 'string',
+                        },
+                        page_numbers: {
+                            type: 'array',
+                            items: {
+                                type: 'integer',
+                            },
+                        },
+                    },
+                },
+                item2: {
+                    type: 'object',
+                    required: [
+                        'text',
+                    ],
+                    properties: {
+                        text: {
+                            type: 'string',
+                        },
+                        nested_items: {
+                            type: 'array',
+                            items: {
+                                $ref: '#/$defs/item',
+                            },
+                        },
+                    },
+                },
+            },
+            properties: {
+                basic: {
+                    type: 'string',
+                },
+                usesDef: {
+                    type: 'array',
+                    items: {
+                        $ref: '#/$defs/item2',
+                    },
+                },
+                usesDef2: {
+                    type: 'array',
+                    items: {
+                        $ref: '#/$defs/item2',
+                    },
+                },
+            },
+        });
+
+        assert.tsType<typeof withDefs.runtimeType>().equals<{
+            basic: string;
+            usesDef: {
+                text: string;
+                nested_items?: {
+                    text: string;
+                    page_numbers?: number[];
+                }[];
+            }[];
+            usesDef2?: {
+                text: string;
+                nested_items?: {
+                    text: string;
+                    page_numbers?: number[];
+                }[];
+            }[];
+        }>();
+
+        assert.deepEquals(withDefs.default, {
+            basic: '',
+            usesDef: [],
+            usesDef2: [],
+        });
+        assertValidShape(
+            {
+                basic: 'hi',
+                usesDef: [
+                    {
+                        text: 'hi',
+                        nested_items: [
+                            {
+                                text: 'nested!',
+                                page_numbers: [1],
+                            },
+                        ],
+                    },
+                    {
+                        text: 'by',
+                    },
+                ],
+                usesDef2: [
+                    {
+                        text: 'hi',
+                        nested_items: [
+                            {
+                                text: 'nested!',
+                                page_numbers: [1],
+                            },
+                        ],
+                    },
+                    {
+                        text: 'by',
+                    },
+                ],
+            } satisfies typeof withDefs.runtimeType,
+            withDefs,
+        );
+    });
     it('works on multi type definition', () => {
         const withDefs = mapSchemaToShape({
             $schema: 'http://json-schema.org/draft-07/schema#',

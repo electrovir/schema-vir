@@ -136,14 +136,15 @@ export function mapSchemaToShape<
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
 >(rawSchema: Schema, options?: Options): SchemaShape<Schema, Options> {
     return defineShape(
-        recursiveSchemaToShape(rawSchema, [], {}),
+        recursiveSchemaToShape(rawSchema, [], {}, {}),
     ) satisfies Shape as any as SchemaShape<Schema, Options>;
 }
 
 function recursiveSchemaToShape(
     rawSchema: JSONSchema | ReadonlyArray<JSONSchema>,
     keyChain: (string | number)[],
-    parentDefinitions: Record<string, unknown>,
+    parentDefinitions: AnyObject,
+    definitionsShapeCache: AnyObject,
 ): any {
     const keyChainString = keyChain.length ? keyChain.join('>') : 'Top level';
 
@@ -163,29 +164,15 @@ function recursiveSchemaToShape(
                             index,
                         ],
                         parentDefinitions,
+                        definitionsShapeCache,
                     ),
                 ),
             );
         }
 
-        const newDefinitions =
-            '$defs' in schema
-                ? mapObjectValues(schema.$defs as AnyObject, (key, value) => {
-                      return recursiveSchemaToShape(
-                          value,
-                          [
-                              ...keyChain,
-                              '$defs',
-                              String(key),
-                          ],
-                          parentDefinitions,
-                      ) as AnyObject;
-                  })
-                : {};
-
-        const definitions = {
+        const definitions: AnyObject = {
             ...parentDefinitions,
-            ...newDefinitions,
+            ...('$defs' in schema ? (schema.$defs as AnyObject) : {}),
         };
 
         if (schema.type === 'array') {
@@ -193,7 +180,9 @@ function recursiveSchemaToShape(
                 throw new Error('Got an array without items.');
             }
 
-            return [recursiveSchemaToShape(schema.items, keyChain, definitions)];
+            return [
+                recursiveSchemaToShape(schema.items, keyChain, definitions, definitionsShapeCache),
+            ];
         } else if (schema.type === 'object') {
             if (!schema.properties) {
                 throw new Error('Got an object without properties.');
@@ -210,6 +199,7 @@ function recursiveSchemaToShape(
                         key,
                     ],
                     definitions,
+                    definitionsShapeCache,
                 );
 
                 if (isPropertyOptional) {
@@ -244,7 +234,18 @@ function recursiveSchemaToShape(
             const definition = definitions[refKey];
 
             if (definition) {
-                return definition;
+                if (refKey in definitionsShapeCache) {
+                    return definitionsShapeCache[refKey];
+                } else {
+                    const definitionShape = recursiveSchemaToShape(
+                        definition,
+                        keyChain,
+                        definitions,
+                        definitionsShapeCache,
+                    );
+                    definitionsShapeCache[refKey] = definitionShape;
+                    return definitionShape;
+                }
             } else {
                 throw new Error(`No definition found for '${schema.$ref}'`);
             }
@@ -256,7 +257,8 @@ function recursiveSchemaToShape(
                         type: individualType,
                     },
                     keyChain,
-                    parentDefinitions,
+                    definitions,
+                    definitionsShapeCache,
                 );
             });
 
