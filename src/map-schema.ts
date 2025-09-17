@@ -248,8 +248,21 @@ function recursiveSchemaToShape(
             } else {
                 throw new Error(`No definition found for '${schema.$ref}'`);
             }
+        } else if (check.isArray(schema.type)) {
+            const possibleSchemas = schema.type.map((individualType) => {
+                return recursiveSchemaToShape(
+                    {
+                        ...schema,
+                        type: individualType,
+                    },
+                    keyChain,
+                    parentDefinitions,
+                );
+            });
+
+            return unionShape<any>(...possibleSchemas);
         } else {
-            throw new Error(`Unexpected schema: ${stringify(schema)}`);
+            throw new TypeError(`Unexpected schema: ${stringify(schema)}`);
         }
     } catch (error) {
         throw ensureErrorAndPrependMessage(error, `${keyChainString}:`);
