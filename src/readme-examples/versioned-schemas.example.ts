@@ -1,42 +1,4 @@
-# schema-vir
-
-Utilities for handling JSON Schemas and mapping them to [object-shape-tester](https://www.npmjs.com/package/object-shape-tester) `Shape` instances.
-
-## Install
-
-```sh
-npm i schema-vir
-```
-
-## Usage
-
-### Mapping Schema to Shape
-
-`mapSchemaToShape` converts a JSON Schema object into an [object-shape-tester](https://www.npmjs.com/package/object-shape-tester) `Shape` instance, which can then be used for its automatically generated default value, ensuring TypeScript types, and validating runtime values. (See [object-shape-tester](https://www.npmjs.com/package/object-shape-tester) for more details on how `Shape` is used.)
-
-<!-- example-link: src/readme-examples/simple-usage.example.ts -->
-
-```TypeScript
-import {mapSchemaToShape} from 'schema-vir';
-
-const myShape = mapSchemaToShape({
-    type: 'object',
-    properties: {
-        a: {
-            type: 'string',
-        },
-    },
-});
-```
-
-## Versioned Schemas
-
-Use `defineVersionedSchema` to define multiple versioned JSON Schemas and then use `collectVersionedSchemas` to combine them all and generate enums, matchers, types, etc.
-
-<!-- example-link: src/readme-examples/versioned-schemas.example.ts -->
-
-```TypeScript
-import {collectVersionedSchemas, defineVersionedSchema} from 'schema-vir';
+import {collectVersionedSchemas, defineVersionedSchema} from '../index.js';
 
 export const v1Schema = defineVersionedSchema(
     [
@@ -121,4 +83,3 @@ schemas.findMatch({
 
 // Access all possible schema runtime types with `schemas.ValueType`.
 // Access all possible schema runtime types keyed by their version with `schemas.VersionedValueType`.
-```
