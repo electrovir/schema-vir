@@ -1,4 +1,4 @@
-import {defineVersionedSchema} from './versioned-schemas.js';
+import {defineVersionedSchema, defineVersionedSchemaSuite} from './versioned-schemas.js';
 
 export const mockV1Schema = defineVersionedSchema(
     [
@@ -297,3 +297,11 @@ export const missingSchemaVersionMock = defineVersionedSchema(
         },
     },
 );
+
+export const validMockSchemas = {
+    mockV1Schema,
+    mockV2Schema,
+    mockV3Schema,
+} as const;
+
+export const mockVersionedSchemaSuite = defineVersionedSchemaSuite(validMockSchemas);

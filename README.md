@@ -31,12 +31,12 @@ const myShape = mapSchemaToShape({
 
 ## Versioned Schemas
 
-Use `defineVersionedSchema` to define multiple versioned JSON Schemas and then use `collectVersionedSchemas` to combine them all and generate enums, matchers, types, etc.
+Use `defineVersionedSchema` to define multiple versioned JSON Schemas and then use `defineVersionedSchemaSuite` to combine them all and generate enums, matchers, types, etc.
 
 <!-- example-link: src/readme-examples/versioned-schemas.example.ts -->
 
 ```TypeScript
-import {collectVersionedSchemas, defineVersionedSchema} from 'schema-vir';
+import {defineVersionedSchema, defineVersionedSchemaSuite} from 'schema-vir';
 
 export const v1Schema = defineVersionedSchema(
     [
@@ -100,7 +100,7 @@ export const v2Schema = defineVersionedSchema(
     },
 );
 
-const schemas = collectVersionedSchemas({
+const schemas = defineVersionedSchemaSuite({
     v1Schema,
     v2Schema,
 });

@@ -1,4 +1,4 @@
-import {collectVersionedSchemas, defineVersionedSchema} from '../index.js';
+import {defineVersionedSchema, defineVersionedSchemaSuite} from '../index.js';
 
 export const v1Schema = defineVersionedSchema(
     [
@@ -62,7 +62,7 @@ export const v2Schema = defineVersionedSchema(
     },
 );
 
-const schemas = collectVersionedSchemas({
+const schemas = defineVersionedSchemaSuite({
     v1Schema,
     v2Schema,
 });

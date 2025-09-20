@@ -7,13 +7,19 @@ import {
     mapObjectValues,
     type AnyObject,
     type ArrayElement,
-    type DeepValue,
     type Values,
 } from '@augment-vir/common';
 import {type JSONSchema} from 'json-schema-to-ts';
-import {checkValidShape, type Shape} from 'object-shape-tester';
+import {checkValidShape} from 'object-shape-tester';
 import {type IsEqual, type OmitIndexSignature} from 'type-fest';
 import {mapSchemaToShape, type SchemaShape, type SchemaShapeOptions} from './map-schema.js';
+import {
+    extractSchemaVersion,
+    type BaseVersionedSchemas,
+    type SchemaMatch,
+    type VersionEnum,
+    type VersionMap,
+} from './versioned-schema-types.js';
 
 /**
  * Converts a JSON Schema into a Shape and requires a const schema version to exist within the
@@ -46,28 +52,6 @@ export function defineVersionedSchema<
 }
 
 /**
- * A versioned schema instance. Output of {@link defineVersionedSchema}.
- *
- * @category Internal
- */
-export type VersionedSchema<
-    VersionPath extends ReadonlyArray<string> = ReadonlyArray<string>,
-    Schema extends JSONSchema = any,
-    // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-    Options extends SchemaShapeOptions = {},
-> = {
-    versionPath: Readonly<VersionPath>;
-    schemaShape: Readonly<SchemaShape<Schema, Options>>;
-};
-
-/**
- * Base type for inputs to {@link collectVersionedSchemas}.
- *
- * @category Internal
- */
-export type BaseVersionedSchemas = Record<string, VersionedSchema>;
-
-/**
  * Combines multiple versioned schemas into a single object which contains:
  *
  * - The original versioned schemas (`.originalVersionedSchemas`).
@@ -80,9 +64,9 @@ export type BaseVersionedSchemas = Record<string, VersionedSchema>;
  *
  * @category Main
  */
-export function collectVersionedSchemas<
+export function defineVersionedSchemaSuite<
     const VersionedSchemas extends Readonly<BaseVersionedSchemas>,
->(versionedSchemas: Readonly<VersionedSchemas>): CollectedVersionedSchemas<VersionedSchemas> {
+>(versionedSchemas: Readonly<VersionedSchemas>): VersionedSchemaSuite<VersionedSchemas> {
     assertVersionedSchemas(versionedSchemas);
 
     const versions = mapObject(versionedSchemas, (key, versionedSchema) => {
@@ -111,12 +95,18 @@ export function collectVersionedSchemas<
         'VersionedValueType',
     ] as const;
 
-    const result: Omit<VersionedSchemasObject<VersionedSchemas>, ArrayElement<typeof typeKeys>> = {
+    const result: Omit<
+        VersionedSchemaSuiteObject<VersionedSchemas>,
+        ArrayElement<typeof typeKeys>
+    > = {
         originalVersionedSchemas: versionedSchemas,
         versions,
         Version,
-        findMatch(raw) {
-            return findSchemaMatch(versions, raw);
+        findMatch(data) {
+            return findSchemaMatch<VersionedSchemaSuiteObject<VersionedSchemas>['versions']>(
+                versions,
+                data,
+            );
         },
     };
 
@@ -144,7 +134,7 @@ export function collectVersionedSchemas<
         ) satisfies Record<ArrayElement<typeof typeKeys>, PropertyDescriptor>,
     );
 
-    return result as CollectedVersionedSchemas<VersionedSchemas>;
+    return result as VersionedSchemaSuite<VersionedSchemas>;
 }
 
 /** Asserts that the raw versioned schema inputs are valid. */
@@ -168,21 +158,21 @@ function assertVersionedSchemas(versionedSchemas: Readonly<BaseVersionedSchemas>
 }
 
 /**
- * All outputs from {@link collectVersionedSchemas} with input validation.
+ * All outputs from {@link defineVersionedSchemaSuite} with input validation.
  *
  * @category Internal
  */
-export type CollectedVersionedSchemas<VersionedSchemas extends Readonly<BaseVersionedSchemas>> =
+export type VersionedSchemaSuite<VersionedSchemas extends Readonly<BaseVersionedSchemas>> =
     IsEqual<keyof OmitIndexSignature<VersionEnum<VersionedSchemas>>, never> extends true
         ? 'ERROR: Invalid schema: optional or non-const version detected.'
-        : VersionedSchemasObject<VersionedSchemas>;
+        : VersionedSchemaSuiteObject<VersionedSchemas>;
 
 /**
- * All outputs from {@link collectVersionedSchemas}.
+ * All outputs from {@link defineVersionedSchemaSuite}.
  *
  * @category Internal
  */
-export type VersionedSchemasObject<VersionedSchemas extends Readonly<BaseVersionedSchemas>> = {
+export type VersionedSchemaSuiteObject<VersionedSchemas extends Readonly<BaseVersionedSchemas>> = {
     /** The original versioned schemas. */
     originalVersionedSchemas: VersionedSchemas;
     /** Each schema mapped by its version string. */
@@ -196,95 +186,28 @@ export type VersionedSchemasObject<VersionedSchemas extends Readonly<BaseVersion
         [Version in keyof VersionMap<VersionedSchemas>]: VersionMap<VersionedSchemas>[Version]['schemaShape']['runtimeType'];
     };
     /** A function that matches a raw data instance to its corresponding schema version. */
-    findMatch: (raw: Readonly<AnyObject>) => SchemaMatch<VersionedSchemas> | undefined;
+    findMatch: (data: Readonly<AnyObject>) => SchemaMatch<VersionMap<VersionedSchemas>> | undefined;
 };
 
 /**
- * Output of `VersionedSchemasObject.findMatch`. Data and the schema version that it was matched
- * with.
+ * It is not recommended to use this directly. Instead, use
+ * `defineVersionedSchemaSuite(schemas).findMatch()`.
  *
- * @category Internal
- */
-export type SchemaMatch<VersionedSchemas extends Readonly<BaseVersionedSchemas>> = {
-    data: Values<VersionMap<VersionedSchemas>>['schemaShape']['runtimeType'];
-} & Values<VersionMap<VersionedSchemas>>;
-
-/**
- * Converts an object of versioned schemas to an enum of their available schema versions.
- *
- * @category Internal
- */
-export type VersionEnum<VersionedSchemas extends Readonly<BaseVersionedSchemas>> = {
-    [Version in keyof VersionMap<VersionedSchemas>]: Version;
-};
-
-/**
- * Maps all schema versions to the schema shape and version.
- *
- * @category Internal
- */
-export type VersionMap<VersionedSchemas extends Readonly<BaseVersionedSchemas>> = {
-    [Key in keyof VersionedSchemas]: {
-        schemaVersion: ExtractVersion<VersionedSchemas[Key]>;
-        schemaShape: VersionedSchemas[Key]['schemaShape'];
-    };
-} extends infer InnerVersions extends Record<string, {schemaVersion: string; schemaShape: Shape}>
-    ? {
-          [VersionKey in Values<InnerVersions>['schemaVersion']]: {
-              version: VersionKey;
-              versionPath: ReadonlyArray<string>;
-              schemaShape: Extract<
-                  Values<InnerVersions>,
-                  {schemaVersion: VersionKey}
-              >['schemaShape'];
-          };
-      }
-    : never;
-
-/**
- * Extracts the version string from a versioned schema.
- *
- * @category Internal
- */
-export type ExtractVersion<Schema extends Readonly<VersionedSchema>> =
-    Schema['schemaShape']['runtimeType'] extends AnyObject
-        ? DeepValue<Schema['schemaShape']['runtimeType'], Schema['versionPath']>
-        : 'ERROR: cannot extract schema version from non object.';
-
-/**
- * Extracts the runtime schema version from a versioned schema.
- *
- * @category Internal
- */
-export function extractSchemaVersion<const Schema extends Readonly<VersionedSchema>>(
-    schemaShape: Readonly<Schema>,
-): ExtractVersion<Schema> {
-    const schemaVersion = getDeepValue<any, any>(
-        schemaShape.schemaShape.default,
-        schemaShape.versionPath,
-    );
-
-    assert.isString(schemaVersion, 'Failed to extract schema version.');
-
-    return schemaVersion as ExtractVersion<Schema>;
-}
-
-/**
  * An external version of `VersionedSchemasObject.findMatch`.
  *
  * @category Internal
  */
-export function findSchemaMatch<const VersionedSchemas extends Readonly<BaseVersionedSchemas>>(
-    versions: Readonly<VersionMap<VersionedSchemas>>,
-    raw: Readonly<AnyObject>,
-): SchemaMatch<VersionedSchemas> | undefined {
+export function findSchemaMatch<const Versions extends Readonly<VersionMap<any>>>(
+    versions: Readonly<Versions>,
+    data: Readonly<AnyObject>,
+): SchemaMatch<Versions> | undefined {
     const matchedSchemas = Object.values(versions as Readonly<VersionMap<any>>).filter(
         ({schemaShape, version, versionPath}) => {
-            const rawVersion = getDeepValue<any, any>(raw, versionPath);
+            const rawVersion = getDeepValue<any, any>(data, versionPath);
 
             return (
                 rawVersion === version &&
-                checkValidShape(raw, schemaShape, {
+                checkValidShape(data, schemaShape, {
                     allowExtraKeys: true,
                 })
             );
@@ -299,7 +222,7 @@ export function findSchemaMatch<const VersionedSchemas extends Readonly<BaseVers
     }
 
     return {
-        data: raw,
+        data,
         ...matchedSchemas[0],
-    } satisfies SchemaMatch<any> as SchemaMatch<VersionedSchemas>;
+    } satisfies SchemaMatch<any> as SchemaMatch<Versions>;
 }

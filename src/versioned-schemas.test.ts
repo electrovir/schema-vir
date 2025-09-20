@@ -1,34 +1,29 @@
 import {assert} from '@augment-vir/assert';
 import {describe, it} from '@augment-vir/test';
-import {collectVersionedSchemas, extractSchemaVersion} from './versioned-schemas.js';
+import {extractSchemaVersion} from './versioned-schema-types.js';
+import {defineVersionedSchemaSuite} from './versioned-schemas.js';
 import {
     missingSchemaVersionMock,
     mockV1Schema,
     mockV2Schema,
     mockV3Schema,
+    mockVersionedSchemaSuite,
     nonConstVersionMock,
     optionalVersionMockSchema,
+    validMockSchemas,
 } from './versioned-schemas.mock.js';
 
-describe(collectVersionedSchemas.name, () => {
+describe(defineVersionedSchemaSuite.name, () => {
     it('combines versioned schemas', () => {
-        const rawSchemas = {
-            mockV1Schema,
-            mockV2Schema,
-            mockV3Schema,
-        } as const;
-
-        const allSchemas = collectVersionedSchemas(rawSchemas);
-
         /** Testing `.originalVersionedSchemas`. */
         assert.strictEquals(
-            allSchemas.originalVersionedSchemas,
-            rawSchemas,
+            mockVersionedSchemaSuite.originalVersionedSchemas,
+            validMockSchemas,
             '.versionedSchemas mismatch',
         );
         /** Testing `.versions` */
         assert.deepEquals(
-            allSchemas.versions,
+            mockVersionedSchemaSuite.versions,
             {
                 v1: {
                     version: 'v1',
@@ -48,7 +43,7 @@ describe(collectVersionedSchemas.name, () => {
             },
             '.versions mismatch',
         );
-        assert.tsType(allSchemas.versions).equals<
+        assert.tsType(mockVersionedSchemaSuite.versions).equals<
             Readonly<{
                 v1: Readonly<{
                     version: 'v1';
@@ -70,7 +65,7 @@ describe(collectVersionedSchemas.name, () => {
 
         /** Testing `.Version`. */
         assert.deepEquals(
-            allSchemas.Version,
+            mockVersionedSchemaSuite.Version,
             {
                 v1: 'v1',
                 v2: 'v2',
@@ -78,7 +73,7 @@ describe(collectVersionedSchemas.name, () => {
             },
             '.Version mismatch',
         );
-        assert.tsType(allSchemas.Version).equals<{
+        assert.tsType(mockVersionedSchemaSuite.Version).equals<{
             v1: 'v1';
             v2: 'v2';
             v3: 'v3';
@@ -86,14 +81,14 @@ describe(collectVersionedSchemas.name, () => {
 
         /** Testing `.ValueType`. */
         assert.throws(
-            () => allSchemas.ValueType,
+            () => mockVersionedSchemaSuite.ValueType,
             {
                 matchMessage: 'Cannot access ValueType as a value, it is only a type.',
             },
             '.ValueType mismatch',
         );
         assert
-            .tsType<typeof allSchemas.ValueType>()
+            .tsType<typeof mockVersionedSchemaSuite.ValueType>()
             .equals<
                 | typeof mockV1Schema.schemaShape.runtimeType
                 | typeof mockV2Schema.schemaShape.runtimeType
@@ -102,13 +97,13 @@ describe(collectVersionedSchemas.name, () => {
 
         /** Testing `.VersionedValueType`. */
         assert.throws(
-            () => allSchemas.VersionedValueType,
+            () => mockVersionedSchemaSuite.VersionedValueType,
             {
                 matchMessage: 'Cannot access VersionedValueType as a value, it is only a type.',
             },
             '.VersionedValueType mismatch',
         );
-        assert.tsType<typeof allSchemas.VersionedValueType>().equals<{
+        assert.tsType<typeof mockVersionedSchemaSuite.VersionedValueType>().equals<{
             v1: typeof mockV1Schema.schemaShape.runtimeType;
             v2: typeof mockV2Schema.schemaShape.runtimeType;
             v3: typeof mockV3Schema.schemaShape.runtimeType;
@@ -116,16 +111,16 @@ describe(collectVersionedSchemas.name, () => {
 
         /** Testing `.findMatch()` */
         assert.isDefined(
-            allSchemas.findMatch({
+            mockVersionedSchemaSuite.findMatch({
                 schemaVersion: 'v1',
                 topProp: {
                     secondProp: {},
                 },
-            } satisfies (typeof allSchemas.VersionedValueType)['v1']),
+            } satisfies (typeof mockVersionedSchemaSuite.VersionedValueType)['v1']),
             '.findMatch match mismatch',
         );
         assert.isUndefined(
-            allSchemas.findMatch({
+            mockVersionedSchemaSuite.findMatch({
                 schemaVersion: 'v99',
                 topProp: {
                     secondProp: {},
@@ -134,7 +129,7 @@ describe(collectVersionedSchemas.name, () => {
             '.findMatch mismatch on schema version',
         );
         assert.isUndefined(
-            allSchemas.findMatch({
+            mockVersionedSchemaSuite.findMatch({
                 topProp: {
                     secondProp: {},
                 },
@@ -142,7 +137,7 @@ describe(collectVersionedSchemas.name, () => {
             '.findMatch mismatch on schema version path',
         );
         assert.isUndefined(
-            allSchemas.findMatch({
+            mockVersionedSchemaSuite.findMatch({
                 schemaVersion: 'v1',
                 topProp: {
                     wrongProp: {},
@@ -153,7 +148,7 @@ describe(collectVersionedSchemas.name, () => {
     });
 
     it('errors on optional schema version', () => {
-        const result = collectVersionedSchemas({
+        const result = defineVersionedSchemaSuite({
             mockV1Schema,
             optionalVersionMockSchema,
         });
@@ -163,7 +158,7 @@ describe(collectVersionedSchemas.name, () => {
             .equals<'ERROR: Invalid schema: optional or non-const version detected.'>();
     });
     it('errors on non-const schema version', () => {
-        const result = collectVersionedSchemas({
+        const result = defineVersionedSchemaSuite({
             mockV1Schema,
             nonConstVersionMock,
         });
@@ -175,7 +170,7 @@ describe(collectVersionedSchemas.name, () => {
     it('errors on missing schema path', () => {
         assert.throws(
             () => {
-                const result = collectVersionedSchemas({
+                const result = defineVersionedSchemaSuite({
                     mockV1Schema,
                     invalidSchemaVersionPath: missingSchemaVersionMock,
                 });
@@ -190,7 +185,7 @@ describe(collectVersionedSchemas.name, () => {
         );
     });
     it('errors on invalid schema version path', () => {
-        const result = collectVersionedSchemas({
+        const result = defineVersionedSchemaSuite({
             mockV1Schema,
             nonConstVersionMock,
         });
@@ -202,7 +197,7 @@ describe(collectVersionedSchemas.name, () => {
     it('errors on duplicate versions', () => {
         assert.throws(
             () => {
-                collectVersionedSchemas({
+                defineVersionedSchemaSuite({
                     mockV1Schema,
                     another: mockV1Schema,
                 });
