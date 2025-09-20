@@ -12,9 +12,24 @@ export type SchemaMapper<
     Versions extends VersionMap<any>,
     Version extends keyof Versions,
     MapOutput,
+    Context,
 > = {
     version: Version;
-    mapper: SchemaMapperMethod<Versions, Version, MapOutput>;
+    mapper: SchemaMapperMethod<Versions, Version, MapOutput, Context>;
+};
+
+/**
+ * Params for {@link SchemaMapperMethod}.
+ *
+ * @category Internal
+ */
+export type SchemaMapperParams<
+    Versions extends VersionMap<any>,
+    Version extends keyof Versions,
+    Context,
+> = {
+    data: Versions[Version]['schemaShape']['runtimeType'];
+    context: Context;
 };
 
 /**
@@ -26,17 +41,18 @@ export type SchemaMapperMethod<
     Versions extends VersionMap<any>,
     Version extends keyof Versions,
     MapOutput,
-> = (value: Versions[Version]['schemaShape']['runtimeType']) => MapOutput;
+    Context,
+> = (params: SchemaMapperParams<Versions, Version, Context>) => MapOutput;
 
 /**
  * Output of `SchemaMapperSuite.collectMappers`.
  *
  * @category Internal
  */
-export type CollectedSchemaMappers<Versions extends VersionMap<any>, MapOutput> = {
+export type CollectedSchemaMappers<Versions extends VersionMap<any>, MapOutput, Context> = {
     /** All the mappers, keyed by schema version. */
     mappers: {
-        [Version in keyof Versions]: SchemaMapper<Versions, Version, MapOutput>;
+        [Version in keyof Versions]: SchemaMapper<Versions, Version, MapOutput, Context>;
     };
 
     /**
@@ -44,7 +60,11 @@ export type CollectedSchemaMappers<Versions extends VersionMap<any>, MapOutput> 
      *
      * @throws If the data does not match any schema.
      */
-    mapSchema: (data: Readonly<AnyObject>) => MapOutput;
+    mapSchema: (
+        ...params: Context extends undefined
+            ? [data: Readonly<AnyObject>, context?: Context]
+            : [data: Readonly<AnyObject>, context: Context]
+    ) => MapOutput;
 };
 
 /**
@@ -53,14 +73,15 @@ export type CollectedSchemaMappers<Versions extends VersionMap<any>, MapOutput> 
  * @category Internal
  */
 export type SchemaMapperSuite<
-    MapOutput,
     SchemaSuite extends Readonly<VersionedSchemaSuiteObject<any>>,
+    MapOutput,
+    Context,
 > = {
     /** Defines a schema mapper for a specific schema version. */
     defineMapper: {
         [Version in keyof SchemaSuite['versions']]: (
-            mapper: SchemaMapperMethod<SchemaSuite['versions'], Version, MapOutput>,
-        ) => SchemaMapper<SchemaSuite['versions'], Version, MapOutput>;
+            mapper: SchemaMapperMethod<SchemaSuite['versions'], Version, MapOutput, Context>,
+        ) => SchemaMapper<SchemaSuite['versions'], Version, MapOutput, Context>;
     };
     /**
      * Collects multiple mappers together for running mapping.
@@ -69,8 +90,8 @@ export type SchemaMapperSuite<
      *   single schema version.
      */
     collectMappers: (
-        mappers: Record<string, SchemaMapper<SchemaSuite['versions'], any, MapOutput>>,
-    ) => CollectedSchemaMappers<SchemaSuite['versions'], MapOutput>;
+        mappers: Record<string, SchemaMapper<SchemaSuite['versions'], any, MapOutput, Context>>,
+    ) => CollectedSchemaMappers<SchemaSuite['versions'], MapOutput, Context>;
 };
 
 /**
@@ -78,16 +99,21 @@ export type SchemaMapperSuite<
  *
  * @category Main
  */
-export function defineSchemaMapperSuite<MapOutput>() {
+export function defineSchemaMapperSuite<MapOutput, Context = undefined>() {
     return <const SchemaSuite extends Readonly<VersionedSchemaSuiteObject<any>>>(
         schemaSuite: Readonly<SchemaSuite>,
-    ): SchemaMapperSuite<MapOutput, SchemaSuite> => {
+    ): SchemaMapperSuite<SchemaSuite, MapOutput, Context> => {
         const defineMapper: Record<
-            keyof SchemaMapperSuite<MapOutput, SchemaSuite>['defineMapper'],
-            Values<SchemaMapperSuite<MapOutput, SchemaSuite>['defineMapper']>
+            keyof SchemaMapperSuite<SchemaSuite, MapOutput, Context>['defineMapper'],
+            Values<SchemaMapperSuite<SchemaSuite, MapOutput, Context>['defineMapper']>
         > = mapObjectValues(schemaSuite.versions, (version) => {
             return (
-                mapper: SchemaMapperMethod<SchemaSuite['versions'], typeof version, MapOutput>,
+                mapper: SchemaMapperMethod<
+                    SchemaSuite['versions'],
+                    typeof version,
+                    MapOutput,
+                    Context
+                >,
             ) => {
                 return defineSchemaMapper(schemaSuite.versions, version, mapper);
             };
@@ -95,13 +121,19 @@ export function defineSchemaMapperSuite<MapOutput>() {
 
         return {
             defineMapper: defineMapper as AnyObject as SchemaMapperSuite<
+                SchemaSuite,
                 MapOutput,
-                SchemaSuite
+                Context
             >['defineMapper'],
             collectMappers(
                 mappers: Record<
                     string,
-                    SchemaMapper<SchemaSuite['versions'], keyof SchemaSuite['versions'], MapOutput>
+                    SchemaMapper<
+                        SchemaSuite['versions'],
+                        keyof SchemaSuite['versions'],
+                        MapOutput,
+                        Context
+                    >
                 >,
             ) {
                 return collectMappers(schemaSuite.versions, mappers);
@@ -122,11 +154,12 @@ export function defineSchemaMapper<
     const Versions extends VersionMap<any>,
     const Version extends keyof Versions,
     MapOutput,
+    Context,
 >(
     versions: Versions,
     version: Version,
-    mapper: (value: Versions[Version]['schemaShape']['runtimeType']) => MapOutput,
-): SchemaMapper<Versions, Version, MapOutput> {
+    mapper: SchemaMapperMethod<Versions, Version, MapOutput, Context>,
+): SchemaMapper<Versions, Version, MapOutput, Context> {
     assert.hasKey(versions, version, `Invalid schema mapper version: '${String(version)}'`);
 
     return {
@@ -143,15 +176,14 @@ export function defineSchemaMapper<
  *
  * @category Internal
  */
-export function collectMappers<const Versions extends VersionMap<any>, MapOutput>(
+export function collectMappers<const Versions extends VersionMap<any>, MapOutput, Context>(
     versions: Versions,
-    mappers: Record<string, SchemaMapper<Versions, keyof Versions, MapOutput>>,
-): CollectedSchemaMappers<Versions, MapOutput> {
+    mappers: Record<string, SchemaMapper<Versions, keyof Versions, MapOutput, Context>>,
+): CollectedSchemaMappers<Versions, MapOutput, Context> {
     const versionsUsed: (keyof Versions)[] = [];
 
-    const mappersByVersion: CollectedSchemaMappers<Versions, MapOutput>['mappers'] = mapObject(
-        mappers,
-        (key, mapper) => {
+    const mappersByVersion: CollectedSchemaMappers<Versions, MapOutput, Context>['mappers'] =
+        mapObject(mappers, (key, mapper) => {
             if (versionsUsed.includes(mapper.version)) {
                 throw new Error(
                     `Duplicate mapper for version '${String(mapper.version)}' detected at key '${key}'`,
@@ -163,11 +195,10 @@ export function collectMappers<const Versions extends VersionMap<any>, MapOutput
                 key: mapper.version,
                 value: mapper,
             };
-        },
-    ) satisfies Record<
-        keyof CollectedSchemaMappers<Versions, MapOutput>['mappers'],
-        Values<CollectedSchemaMappers<Versions, MapOutput>['mappers']>
-    > as AnyObject as CollectedSchemaMappers<Versions, MapOutput>['mappers'];
+        }) satisfies Record<
+            keyof CollectedSchemaMappers<Versions, MapOutput, Context>['mappers'],
+            Values<CollectedSchemaMappers<Versions, MapOutput, Context>['mappers']>
+        > as AnyObject as CollectedSchemaMappers<Versions, MapOutput, Context>['mappers'];
 
     const missingVersions: string[] = Object.keys(versions).filter(
         (version) => !versionsUsed.includes(version),
@@ -179,8 +210,8 @@ export function collectMappers<const Versions extends VersionMap<any>, MapOutput
 
     return {
         mappers: mappersByVersion,
-        mapSchema(data) {
-            return mapSchema(versions, mappersByVersion, data);
+        mapSchema(...params) {
+            return mapSchema(versions, mappersByVersion, ...params);
         },
     };
 }
@@ -193,10 +224,15 @@ export function collectMappers<const Versions extends VersionMap<any>, MapOutput
  *
  * @category Internal
  */
-export function mapSchema<const Versions extends VersionMap<any>, MapOutput>(
+export function mapSchema<const Versions extends VersionMap<any>, MapOutput, Context>(
     versions: Versions,
-    mappers: CollectedSchemaMappers<Versions, MapOutput>['mappers'],
-    data: Readonly<AnyObject>,
+    mappers: CollectedSchemaMappers<Versions, MapOutput, Context>['mappers'],
+    ...[
+        data,
+        context,
+    ]: Context extends undefined
+        ? [data: Readonly<AnyObject>, context?: Context]
+        : [data: Readonly<AnyObject>, context: Context]
 ): MapOutput {
     const schemaMatch = findSchemaMatch<Versions>(versions, data);
 
@@ -208,5 +244,8 @@ export function mapSchema<const Versions extends VersionMap<any>, MapOutput>(
 
     assert.isDefined(mapper, `No mapper found for version '${schemaMatch.version}'`);
 
-    return mapper(data);
+    return mapper({
+        data,
+        context: context as Context,
+    });
 }

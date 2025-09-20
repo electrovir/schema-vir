@@ -3,6 +3,7 @@ import {describe, it} from '@augment-vir/test';
 import {assertValidShape} from 'object-shape-tester';
 import {defineSchemaMapperSuite, type SchemaMapper} from './schema-mapper.js';
 import {type MockMapperOutput, mockMapperSuite} from './schema-mapper.mock.js';
+import {defineVersionedSchema, defineVersionedSchemaSuite} from './versioned-schemas.js';
 import {
     mockV1Schema,
     mockV2Schema,
@@ -12,7 +13,7 @@ import {
 
 describe(defineSchemaMapperSuite.name, () => {
     it('defines a mapper', () => {
-        mockMapperSuite.defineMapper.v1((data) => {
+        mockMapperSuite.defineMapper.v1(({data}) => {
             assert.tsType(data).equals<typeof mockV1Schema.schemaShape.runtimeType>();
 
             return 1;
@@ -20,12 +21,60 @@ describe(defineSchemaMapperSuite.name, () => {
     });
     it('requires correct mapper output', () => {
         // @ts-expect-error: intentionally incorrect mapper return type
-        mockMapperSuite.defineMapper.v1((data) => {
+        mockMapperSuite.defineMapper.v1(() => {
             return 'invalid';
         });
     });
+    it('requires context', () => {
+        const suite = defineSchemaMapperSuite<MockMapperOutput, {context: number}>()(
+            defineVersionedSchemaSuite({
+                mockV1Schema: defineVersionedSchema(
+                    [
+                        'a',
+                        'b',
+                    ],
+                    {
+                        $schema: 'http://json-schema.org/draft-07/schema#',
+                        type: 'object',
+                        required: [
+                            'a',
+                        ],
+                        properties: {
+                            a: {
+                                type: 'object',
+                                required: [
+                                    'b',
+                                ],
+                                properties: {
+                                    b: {
+                                        const: 'v1',
+                                        type: 'string',
+                                    },
+                                },
+                            },
+                        },
+                    },
+                ),
+            }),
+        );
+
+        const {mapSchema} = suite.collectMappers({
+            mockV1Mapper: suite.defineMapper.v1(({context, data}) => {
+                assert.tsType(data).equals<{a: {b: 'v1'}}>();
+                assert.deepEquals(data, {a: {b: 'v1'}});
+                assert.tsType(context).equals<{context: number}>;
+                assert.deepEquals(context, {context: 1});
+                return 1;
+            }),
+        });
+
+        assert.strictEquals(mapSchema({a: {b: 'v1'}}, {context: 1}), 1);
+        // @ts-expect-error: intentionally missing required context input
+        assert.throws(() => mapSchema({a: {b: 'v1'}}));
+    });
+
     it('maps', () => {
-        const v1Mapper = mockMapperSuite.defineMapper.v1((data) => {
+        const v1Mapper = mockMapperSuite.defineMapper.v1(({data}) => {
             assertValidShape(data, mockV1Schema.schemaShape);
             assert.tsType(data).equals<typeof mockV1Schema.schemaShape.runtimeType>();
             return 1;
@@ -33,9 +82,14 @@ describe(defineSchemaMapperSuite.name, () => {
         assert
             .tsType(v1Mapper)
             .equals<
-                SchemaMapper<typeof mockVersionedSchemaSuite.versions, 'v1', MockMapperOutput>
+                SchemaMapper<
+                    typeof mockVersionedSchemaSuite.versions,
+                    'v1',
+                    MockMapperOutput,
+                    undefined
+                >
             >();
-        const v2Mapper = mockMapperSuite.defineMapper.v2((data) => {
+        const v2Mapper = mockMapperSuite.defineMapper.v2(({data}) => {
             assertValidShape(data, mockV2Schema.schemaShape);
             assert.tsType(data).equals<typeof mockV2Schema.schemaShape.runtimeType>();
             return 2;
@@ -43,9 +97,14 @@ describe(defineSchemaMapperSuite.name, () => {
         assert
             .tsType(v2Mapper)
             .equals<
-                SchemaMapper<typeof mockVersionedSchemaSuite.versions, 'v2', MockMapperOutput>
+                SchemaMapper<
+                    typeof mockVersionedSchemaSuite.versions,
+                    'v2',
+                    MockMapperOutput,
+                    undefined
+                >
             >();
-        const v3Mapper = mockMapperSuite.defineMapper.v3((data) => {
+        const v3Mapper = mockMapperSuite.defineMapper.v3(({data}) => {
             assertValidShape(data, mockV3Schema.schemaShape);
             assert.tsType(data).equals<typeof mockV3Schema.schemaShape.runtimeType>();
             return 3;
@@ -53,7 +112,12 @@ describe(defineSchemaMapperSuite.name, () => {
         assert
             .tsType(v3Mapper)
             .equals<
-                SchemaMapper<typeof mockVersionedSchemaSuite.versions, 'v3', MockMapperOutput>
+                SchemaMapper<
+                    typeof mockVersionedSchemaSuite.versions,
+                    'v3',
+                    MockMapperOutput,
+                    undefined
+                >
             >();
 
         const {mapSchema} = mockMapperSuite.collectMappers({
