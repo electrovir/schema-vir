@@ -143,7 +143,7 @@ describe(defineVersionedSchemaSuite.name, () => {
                     wrongProp: {},
                 },
             }),
-            '.findMatch mismatch on data',
+            '.findMatch mismatch on value',
         );
     });
 

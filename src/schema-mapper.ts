@@ -28,7 +28,7 @@ export type SchemaMapperParams<
     Version extends keyof Versions,
     Context,
 > = {
-    data: Versions[Version]['schemaShape']['runtimeType'];
+    value: Versions[Version]['schemaShape']['runtimeType'];
     context: Context;
 };
 
@@ -56,14 +56,14 @@ export type CollectedSchemaMappers<Versions extends VersionMap<any>, MapOutput, 
     };
 
     /**
-     * Detects the data's schema version and runs the appropriate mapper on it.
+     * Detects the value's schema version and runs the appropriate mapper on it.
      *
-     * @throws If the data does not match any schema.
+     * @throws If the value does not match any schema.
      */
     mapSchema: (
         ...params: Context extends undefined
-            ? [data: Readonly<AnyObject>, context?: Context]
-            : [data: Readonly<AnyObject>, context: Context]
+            ? [value: Readonly<AnyObject>, context?: Context]
+            : [value: Readonly<AnyObject>, context: Context]
     ) => MapOutput;
 };
 
@@ -228,13 +228,13 @@ export function mapSchema<const Versions extends VersionMap<any>, MapOutput, Con
     versions: Versions,
     mappers: CollectedSchemaMappers<Versions, MapOutput, Context>['mappers'],
     ...[
-        data,
+        value,
         context,
     ]: Context extends undefined
-        ? [data: Readonly<AnyObject>, context?: Context]
-        : [data: Readonly<AnyObject>, context: Context]
+        ? [value: Readonly<AnyObject>, context?: Context]
+        : [value: Readonly<AnyObject>, context: Context]
 ): MapOutput {
-    const schemaMatch = findSchemaMatch<Versions>(versions, data);
+    const schemaMatch = findSchemaMatch<Versions>(versions, value);
 
     if (!schemaMatch) {
         throw new Error('Data does not match any schemas.');
@@ -245,7 +245,7 @@ export function mapSchema<const Versions extends VersionMap<any>, MapOutput, Con
     assert.isDefined(mapper, `No mapper found for version '${schemaMatch.version}'`);
 
     return mapper({
-        data,
+        value,
         context: context as Context,
     });
 }

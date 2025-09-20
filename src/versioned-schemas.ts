@@ -60,7 +60,8 @@ export function defineVersionedSchema<
  * - A type (do not use at runtime) of all the available schema values (`.ValueType`).
  * - A type (do not use at runtime) that maps each available version to its schema value
  *   (`.VersionedValueType`).
- * - A function that matches a raw data instance to its corresponding schema version (`.findMatch()`).
+ * - A function that matches a raw value instance to its corresponding schema version
+ *   (`.findMatch()`).
  *
  * @category Main
  */
@@ -102,10 +103,10 @@ export function defineVersionedSchemaSuite<
         originalVersionedSchemas: versionedSchemas,
         versions,
         Version,
-        findMatch(data) {
+        findMatch(value) {
             return findSchemaMatch<VersionedSchemaSuiteObject<VersionedSchemas>['versions']>(
                 versions,
-                data,
+                value,
             );
         },
     };
@@ -185,8 +186,10 @@ export type VersionedSchemaSuiteObject<VersionedSchemas extends Readonly<BaseVer
     VersionedValueType: {
         [Version in keyof VersionMap<VersionedSchemas>]: VersionMap<VersionedSchemas>[Version]['schemaShape']['runtimeType'];
     };
-    /** A function that matches a raw data instance to its corresponding schema version. */
-    findMatch: (data: Readonly<AnyObject>) => SchemaMatch<VersionMap<VersionedSchemas>> | undefined;
+    /** A function that matches a raw value instance to its corresponding schema version. */
+    findMatch: (
+        value: Readonly<AnyObject>,
+    ) => SchemaMatch<VersionMap<VersionedSchemas>> | undefined;
 };
 
 /**
@@ -199,15 +202,15 @@ export type VersionedSchemaSuiteObject<VersionedSchemas extends Readonly<BaseVer
  */
 export function findSchemaMatch<const Versions extends Readonly<VersionMap<any>>>(
     versions: Readonly<Versions>,
-    data: Readonly<AnyObject>,
+    value: Readonly<AnyObject>,
 ): SchemaMatch<Versions> | undefined {
     const matchedSchemas = Object.values(versions as Readonly<VersionMap<any>>).filter(
         ({schemaShape, version, versionPath}) => {
-            const rawVersion = getDeepValue<any, any>(data, versionPath);
+            const rawVersion = getDeepValue<any, any>(value, versionPath);
 
             return (
                 rawVersion === version &&
-                checkValidShape(data, schemaShape, {
+                checkValidShape(value, schemaShape, {
                     allowExtraKeys: true,
                 })
             );
@@ -222,7 +225,7 @@ export function findSchemaMatch<const Versions extends Readonly<VersionMap<any>>
     }
 
     return {
-        data,
+        value,
         ...matchedSchemas[0],
     } satisfies SchemaMatch<any> as SchemaMatch<Versions>;
 }

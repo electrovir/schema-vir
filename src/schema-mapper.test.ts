@@ -13,8 +13,8 @@ import {
 
 describe(defineSchemaMapperSuite.name, () => {
     it('defines a mapper', () => {
-        mockMapperSuite.defineMapper.v1(({data}) => {
-            assert.tsType(data).equals<typeof mockV1Schema.schemaShape.runtimeType>();
+        mockMapperSuite.defineMapper.v1(({value}) => {
+            assert.tsType(value).equals<typeof mockV1Schema.schemaShape.runtimeType>();
 
             return 1;
         });
@@ -59,9 +59,9 @@ describe(defineSchemaMapperSuite.name, () => {
         );
 
         const {mapSchema} = suite.collectMappers({
-            mockV1Mapper: suite.defineMapper.v1(({context, data}) => {
-                assert.tsType(data).equals<{a: {b: 'v1'}}>();
-                assert.deepEquals(data, {a: {b: 'v1'}});
+            mockV1Mapper: suite.defineMapper.v1(({context, value}) => {
+                assert.tsType(value).equals<{a: {b: 'v1'}}>();
+                assert.deepEquals(value, {a: {b: 'v1'}});
                 assert.tsType(context).equals<{context: number}>;
                 assert.deepEquals(context, {context: 1});
                 return 1;
@@ -74,9 +74,9 @@ describe(defineSchemaMapperSuite.name, () => {
     });
 
     it('maps', () => {
-        const v1Mapper = mockMapperSuite.defineMapper.v1(({data}) => {
-            assertValidShape(data, mockV1Schema.schemaShape);
-            assert.tsType(data).equals<typeof mockV1Schema.schemaShape.runtimeType>();
+        const v1Mapper = mockMapperSuite.defineMapper.v1(({value}) => {
+            assertValidShape(value, mockV1Schema.schemaShape);
+            assert.tsType(value).equals<typeof mockV1Schema.schemaShape.runtimeType>();
             return 1;
         });
         assert
@@ -89,9 +89,9 @@ describe(defineSchemaMapperSuite.name, () => {
                     undefined
                 >
             >();
-        const v2Mapper = mockMapperSuite.defineMapper.v2(({data}) => {
-            assertValidShape(data, mockV2Schema.schemaShape);
-            assert.tsType(data).equals<typeof mockV2Schema.schemaShape.runtimeType>();
+        const v2Mapper = mockMapperSuite.defineMapper.v2(({value}) => {
+            assertValidShape(value, mockV2Schema.schemaShape);
+            assert.tsType(value).equals<typeof mockV2Schema.schemaShape.runtimeType>();
             return 2;
         });
         assert
@@ -104,9 +104,9 @@ describe(defineSchemaMapperSuite.name, () => {
                     undefined
                 >
             >();
-        const v3Mapper = mockMapperSuite.defineMapper.v3(({data}) => {
-            assertValidShape(data, mockV3Schema.schemaShape);
-            assert.tsType(data).equals<typeof mockV3Schema.schemaShape.runtimeType>();
+        const v3Mapper = mockMapperSuite.defineMapper.v3(({value}) => {
+            assertValidShape(value, mockV3Schema.schemaShape);
+            assert.tsType(value).equals<typeof mockV3Schema.schemaShape.runtimeType>();
             return 3;
         });
         assert

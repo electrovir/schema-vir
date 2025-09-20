@@ -34,7 +34,7 @@ export type BaseVersionedSchemas = Record<string, VersionedSchema>;
  */
 export type SchemaMatch<Versions extends VersionMap<any>> = Readonly<
     {
-        data: Values<Versions>['schemaShape']['runtimeType'];
+        value: Values<Versions>['schemaShape']['runtimeType'];
     } & Values<Versions>
 >;
 
