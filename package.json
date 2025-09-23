@@ -1,6 +1,6 @@
 {
     "name": "schema-vir",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "description": "Heroic schema mappers.",
     "keywords": [
         "JSON Schema",
@@ -44,19 +44,19 @@
         "test:update": "npm run test update"
     },
     "dependencies": {
-        "@augment-vir/assert": "^31.37.0",
-        "@augment-vir/common": "^31.37.0",
+        "@augment-vir/assert": "^31.38.0",
+        "@augment-vir/common": "^31.38.0",
         "json-schema-to-ts": "^3.1.1",
         "object-shape-tester": "^6.5.0",
         "type-fest": "^5.0.1"
     },
     "devDependencies": {
-        "@augment-vir/test": "^31.37.0",
+        "@augment-vir/test": "^31.38.0",
         "@eslint/eslintrc": "^3.3.1",
         "@eslint/js": "^9.36.0",
         "@stylistic/eslint-plugin": "^5.4.0",
         "@stylistic/eslint-plugin-ts": "^4.4.1",
-        "@typescript-eslint/eslint-plugin": "^8.44.0",
+        "@typescript-eslint/eslint-plugin": "^8.44.1",
         "@web/dev-server-esbuild": "^1.0.4",
         "@web/test-runner": "^0.20.2",
         "@web/test-runner-commands": "^0.9.0",
@@ -67,7 +67,7 @@
         "esbuild": "^0.25.10",
         "eslint": "^9.36.0",
         "eslint-config-prettier": "^10.1.8",
-        "eslint-plugin-jsdoc": "^59.0.2",
+        "eslint-plugin-jsdoc": "^60.2.0",
         "eslint-plugin-monorepo-cop": "^1.0.2",
         "eslint-plugin-playwright": "^2.2.2",
         "eslint-plugin-prettier": "^5.5.4",
@@ -88,7 +88,7 @@
         "runstorm": "^0.6.2",
         "typedoc": "^0.28.13",
         "typescript": "^5.9.2",
-        "typescript-eslint": "^8.44.0",
+        "typescript-eslint": "^8.44.1",
         "virmator": "^14.0.4"
     },
     "engines": {
