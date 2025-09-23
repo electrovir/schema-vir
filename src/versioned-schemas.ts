@@ -10,7 +10,7 @@ import {
     type Values,
 } from '@augment-vir/common';
 import {type JSONSchema} from 'json-schema-to-ts';
-import {checkValidShape} from 'object-shape-tester';
+import {assertValidShape} from 'object-shape-tester';
 import {type IsEqual, type OmitIndexSignature} from 'type-fest';
 import {mapSchemaToShape, type SchemaShape, type SchemaShapeOptions} from './map-schema.js';
 import {
@@ -103,8 +103,8 @@ export function defineVersionedSchemaSuite<
         originalVersionedSchemas: versionedSchemas,
         versions,
         Version,
-        findMatch(value) {
-            return findSchemaMatch<VersionedSchemaSuiteObject<VersionedSchemas>['versions']>(
+        matchValue(value) {
+            return matchValue<VersionedSchemaSuiteObject<VersionedSchemas>['versions']>(
                 versions,
                 value,
             );
@@ -187,7 +187,7 @@ export type VersionedSchemaSuiteObject<VersionedSchemas extends Readonly<BaseVer
         [Version in keyof VersionMap<VersionedSchemas>]: VersionMap<VersionedSchemas>[Version]['schemaShape']['runtimeType'];
     };
     /** A function that matches a raw value instance to its corresponding schema version. */
-    findMatch: (
+    matchValue: (
         value: Readonly<AnyObject>,
     ) => SchemaMatch<VersionMap<VersionedSchemas>> | undefined;
 };
@@ -200,20 +200,15 @@ export type VersionedSchemaSuiteObject<VersionedSchemas extends Readonly<BaseVer
  *
  * @category Internal
  */
-export function findSchemaMatch<const Versions extends Readonly<VersionMap<any>>>(
+export function matchValue<const Versions extends Readonly<VersionMap<any>>>(
     versions: Readonly<Versions>,
     value: Readonly<AnyObject>,
-): SchemaMatch<Versions> | undefined {
+): SchemaMatch<Versions> {
     const matchedSchemas = Object.values(versions as Readonly<VersionMap<any>>).filter(
-        ({schemaShape, version, versionPath}) => {
+        ({version, versionPath}) => {
             const rawVersion = getDeepValue<any, any>(value, versionPath);
 
-            return (
-                rawVersion === version &&
-                checkValidShape(value, schemaShape, {
-                    allowExtraKeys: true,
-                })
-            );
+            return rawVersion === version;
         },
     );
 
@@ -221,11 +216,15 @@ export function findSchemaMatch<const Versions extends Readonly<VersionMap<any>>
     if (matchedSchemas.length > 1) {
         assert.never('Matched multiple schemas somehow.');
     } else if (!check.isLengthAtLeast(matchedSchemas, 1)) {
-        return undefined;
+        throw new Error('Data does not match any schemas.');
     }
+
+    const matchedSchema = matchedSchemas[0];
+
+    assertValidShape(value, matchedSchema.schemaShape, {allowExtraKeys: true});
 
     return {
         value,
-        ...matchedSchemas[0],
+        ...matchedSchema,
     } satisfies SchemaMatch<any> as SchemaMatch<Versions>;
 }

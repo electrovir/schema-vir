@@ -111,7 +111,7 @@ describe(defineVersionedSchemaSuite.name, () => {
 
         /** Testing `.findMatch()` */
         assert.isDefined(
-            mockVersionedSchemaSuite.findMatch({
+            mockVersionedSchemaSuite.matchValue({
                 schemaVersion: 'v1',
                 topProp: {
                     secondProp: {},
@@ -119,31 +119,40 @@ describe(defineVersionedSchemaSuite.name, () => {
             } satisfies (typeof mockVersionedSchemaSuite.VersionedValueType)['v1']),
             '.findMatch match mismatch',
         );
-        assert.isUndefined(
-            mockVersionedSchemaSuite.findMatch({
-                schemaVersion: 'v99',
-                topProp: {
-                    secondProp: {},
-                },
-            }),
-            '.findMatch mismatch on schema version',
+        assert.throws(
+            () =>
+                mockVersionedSchemaSuite.matchValue({
+                    schemaVersion: 'v99',
+                    topProp: {
+                        secondProp: {},
+                    },
+                }),
+            {
+                matchMessage: 'data does not match any schemas',
+            },
         );
-        assert.isUndefined(
-            mockVersionedSchemaSuite.findMatch({
-                topProp: {
-                    secondProp: {},
-                },
-            }),
-            '.findMatch mismatch on schema version path',
+        assert.throws(
+            () =>
+                mockVersionedSchemaSuite.matchValue({
+                    topProp: {
+                        secondProp: {},
+                    },
+                }),
+            {
+                matchMessage: 'data does not match any schemas',
+            },
         );
-        assert.isUndefined(
-            mockVersionedSchemaSuite.findMatch({
-                schemaVersion: 'v1',
-                topProp: {
-                    wrongProp: {},
-                },
-            }),
-            '.findMatch mismatch on value',
+        assert.throws(
+            () =>
+                mockVersionedSchemaSuite.matchValue({
+                    schemaVersion: 'v1',
+                    topProp: {
+                        wrongProp: {},
+                    },
+                }),
+            {
+                matchMessage: 'Shape mismatch',
+            },
         );
     });
 
