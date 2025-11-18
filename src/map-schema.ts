@@ -15,7 +15,14 @@ import {
     type FromSchemaOptions,
     type JSONSchema,
 } from 'json-schema-to-ts';
-import {defineShape, exactShape, optionalShape, type Shape, unionShape} from 'object-shape-tester';
+import {
+    defineShape,
+    exactShape,
+    optionalShape,
+    recordShape,
+    type Shape,
+    unionShape,
+} from 'object-shape-tester';
 
 export type {
     FromSchema,
@@ -93,9 +100,11 @@ export type MapSchemaInternal<
                       Options
                   >;
               }>;
-              additionalProperties: Options['allowAdditionalProperties'] extends true
-                  ? true
-                  : false;
+              additionalProperties: Schema['additionalProperties'] extends AnyObject
+                  ? MapSchema<Schema['additionalProperties'], Options>
+                  : Options['allowAdditionalProperties'] extends true
+                    ? true
+                    : false;
           }
         : Schema['type'] extends 'array'
           ? Omit<Schema, 'items'> & {
@@ -184,30 +193,56 @@ function recursiveSchemaToShape(
                 recursiveSchemaToShape(schema.items, keyChain, definitions, definitionsShapeCache),
             ];
         } else if (schema.type === 'object') {
-            if (!schema.properties) {
-                throw new Error('Got an object without properties.');
-            }
             const requiredProperties: ReadonlyArray<string> = schema.required || [];
 
-            return mapObjectValues(schema.properties, (key, propertyValue) => {
-                const isPropertyOptional = !requiredProperties.includes(key);
+            const propertiesShape = schema.properties
+                ? mapObjectValues(schema.properties, (key, propertyValue) => {
+                      const isPropertyOptional = !requiredProperties.includes(key);
 
-                const propertyShape = recursiveSchemaToShape(
-                    propertyValue,
-                    [
-                        ...keyChain,
-                        key,
-                    ],
-                    definitions,
-                    definitionsShapeCache,
+                      const propertyShape = recursiveSchemaToShape(
+                          propertyValue,
+                          [
+                              ...keyChain,
+                              key,
+                          ],
+                          definitions,
+                          definitionsShapeCache,
+                      );
+
+                      if (isPropertyOptional) {
+                          return optionalShape(unionShape(propertyShape, undefined));
+                      } else {
+                          return propertyShape;
+                      }
+                  })
+                : undefined;
+
+            const additionalPropertiesShape = schema.additionalProperties
+                ? recordShape({
+                      keys: '',
+                      values: recursiveSchemaToShape(
+                          schema.additionalProperties,
+                          [
+                              ...keyChain,
+                              'additionalProperties',
+                          ],
+                          definitions,
+                          definitionsShapeCache,
+                      ),
+                  })
+                : undefined;
+
+            if (propertiesShape && additionalPropertiesShape) {
+                throw new Error(
+                    "Do not define 'properties' and a type for 'additionalProperties' at the same time. Both types and shape validation will not work.",
                 );
-
-                if (isPropertyOptional) {
-                    return optionalShape(unionShape(propertyShape, undefined));
-                } else {
-                    return propertyShape;
-                }
-            });
+            } else if (propertiesShape) {
+                return propertiesShape;
+            } else if (additionalPropertiesShape) {
+                return additionalPropertiesShape;
+            } else {
+                throw new Error('Got an object without properties.');
+            }
         } else if (schema.const) {
             return exactShape(schema.const);
         } else if (schema.enum) {

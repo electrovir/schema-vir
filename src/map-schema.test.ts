@@ -5,6 +5,7 @@ import {
     defineShape,
     exactShape,
     optionalShape,
+    recordShape,
     unionShape,
 } from 'object-shape-tester';
 import {mapSchemaToShape, type SchemaShapeOptions} from './map-schema.js';
@@ -57,6 +58,23 @@ describe(mapSchemaToShape.name, () => {
                     ),
                 ),
             }),
+        },
+        {
+            it: 'maps additionalProperties without properties',
+            inputs: [
+                {
+                    type: 'object',
+                    additionalProperties: {
+                        type: 'string',
+                    },
+                },
+            ],
+            expect: defineShape(
+                recordShape({
+                    keys: '',
+                    values: '',
+                }),
+            ),
         },
         {
             it: 'rejects object without properties',
@@ -252,6 +270,86 @@ describe(mapSchemaToShape.name, () => {
                       nestedB: {nestedArrayItem: string}[];
                   };
         }>();
+    });
+
+    it('handles only additional properties', () => {
+        const withAdditionalProperties = mapSchemaToShape({
+            $schema: 'http://json-schema.org/draft-07/schema#',
+            type: 'object',
+            required: [
+                'nested',
+            ],
+            properties: {
+                nested: {
+                    type: 'object',
+                    additionalProperties: {
+                        type: 'string',
+                    },
+                },
+            },
+        });
+
+        assert.tsType<typeof withAdditionalProperties.runtimeType>().equals<{
+            nested: Record<string, string>;
+        }>();
+
+        assert.deepEquals(withAdditionalProperties.default, {
+            nested: {},
+        });
+        assertValidShape(
+            {
+                nested: {},
+            } satisfies typeof withAdditionalProperties.runtimeType,
+            withAdditionalProperties,
+        );
+        assertValidShape(
+            {
+                nested: {
+                    a: 'b',
+                    c: 'd',
+                    e: 'f',
+                },
+            } satisfies typeof withAdditionalProperties.runtimeType,
+            withAdditionalProperties,
+        );
+        assert.throws(() =>
+            assertValidShape(
+                {
+                    nested: {
+                        a: 'b',
+                        c: 'd',
+                        e: 'f',
+                        g: 4,
+                    },
+                },
+                withAdditionalProperties,
+            ),
+        );
+    });
+    it('errors with additional and normal properties', () => {
+        assert.throws(() =>
+            mapSchemaToShape({
+                $schema: 'http://json-schema.org/draft-07/schema#',
+                type: 'object',
+                required: [
+                    'nested',
+                ],
+                properties: {
+                    nested: {
+                        type: 'object',
+                        required: ['yo'],
+                        properties: {
+                            yo: {
+                                type: 'number',
+                            },
+                        },
+                        additionalProperties: {
+                            type: 'string',
+                        },
+                    },
+                },
+            }),
+        );
     });
 
     it('works on definitions', () => {
