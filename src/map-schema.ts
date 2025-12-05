@@ -22,6 +22,7 @@ import {
     recordShape,
     type Shape,
     unionShape,
+    unknownShape,
 } from 'object-shape-tester';
 
 export type {
@@ -92,29 +93,34 @@ export type MapSchemaInternal<
     Schema extends JSONSchema,
     Options extends SchemaShapeOptions,
 > = Schema extends AnyObject
-    ? Schema['type'] extends 'object'
-        ? Omit<Schema, 'properties' | 'additionalProperties'> & {
-              properties: Readonly<{
-                  [Key in keyof Schema['properties']]: MapSchema<
-                      Schema['properties'][Key],
-                      Options
-                  >;
-              }>;
-              additionalProperties: Schema['additionalProperties'] extends AnyObject
-                  ? MapSchema<Schema['additionalProperties'], Options>
-                  : Options['allowAdditionalProperties'] extends true
-                    ? true
-                    : false;
-          }
-        : Schema['type'] extends 'array'
-          ? Omit<Schema, 'items'> & {
-                items: Schema['items'] extends ReadonlyArray<any>
-                    ? Readonly<{
-                          [Key in keyof Schema['items']]: MapSchema<Schema['items'][Key], Options>;
-                      }>
-                    : MapSchema<Schema['items'], Options>;
+    ? Schema['anyOf'] extends (infer UnionEntry extends JSONSchema)[]
+        ? MapSchemaInternal<UnionEntry, Options>
+        : Schema['type'] extends 'object'
+          ? Omit<Schema, 'properties' | 'additionalProperties'> & {
+                properties: Readonly<{
+                    [Key in keyof Schema['properties']]: MapSchema<
+                        Schema['properties'][Key],
+                        Options
+                    >;
+                }>;
+                additionalProperties: Schema['additionalProperties'] extends AnyObject
+                    ? MapSchema<Schema['additionalProperties'], Options>
+                    : Options['allowAdditionalProperties'] extends true
+                      ? true
+                      : false;
             }
-          : Schema
+          : Schema['type'] extends 'array'
+            ? Omit<Schema, 'items'> & {
+                  items: Schema['items'] extends ReadonlyArray<any>
+                      ? Readonly<{
+                            [Key in keyof Schema['items']]: MapSchema<
+                                Schema['items'][Key],
+                                Options
+                            >;
+                        }>
+                      : MapSchema<Schema['items'], Options>;
+              }
+            : Schema
     : Schema;
 
 /**
@@ -177,6 +183,21 @@ function recursiveSchemaToShape(
                     ),
                 ),
             );
+        } else if (check.isArray(schema.anyOf)) {
+            assert.isLengthAtLeast(schema.anyOf, 1, 'Schema anyOf array is empty.');
+            return unionShape(
+                ...typedMap(schema.anyOf, (entry, index) =>
+                    recursiveSchemaToShape(
+                        entry,
+                        [
+                            ...keyChain,
+                            index,
+                        ],
+                        parentDefinitions,
+                        definitionsShapeCache,
+                    ),
+                ),
+            );
         }
 
         const definitions: AnyObject = {
@@ -220,15 +241,17 @@ function recursiveSchemaToShape(
             const additionalPropertiesShape = schema.additionalProperties
                 ? recordShape({
                       keys: '',
-                      values: recursiveSchemaToShape(
-                          schema.additionalProperties,
-                          [
-                              ...keyChain,
-                              'additionalProperties',
-                          ],
-                          definitions,
-                          definitionsShapeCache,
-                      ),
+                      values: check.isObject(schema.additionalProperties)
+                          ? recursiveSchemaToShape(
+                                schema.additionalProperties,
+                                [
+                                    ...keyChain,
+                                    'additionalProperties',
+                                ],
+                                definitions,
+                                definitionsShapeCache,
+                            )
+                          : unknownShape(),
                   })
                 : undefined;
 

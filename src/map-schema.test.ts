@@ -610,6 +610,66 @@ describe(mapSchemaToShape.name, () => {
             withDefs,
         );
     });
+    it('works with anyOf', () => {
+        const withAnyOf = mapSchemaToShape({
+            $schema: 'http://json-schema.org/draft-07/schema#',
+            type: 'object',
+            required: [
+                'value',
+            ],
+            properties: {
+                value: {
+                    anyOf: [
+                        {
+                            type: 'string',
+                        },
+                        {
+                            minimum: 0,
+                            type: 'number',
+                        },
+                        {
+                            type: 'object',
+                            additionalProperties: true,
+                        },
+                    ],
+                },
+            },
+        });
+
+        assert.tsType<typeof withAnyOf.runtimeType>().equals<{
+            value: string | number | Record<string, unknown>;
+        }>();
+
+        assert.deepEquals(withAnyOf.default, {
+            value: '',
+        });
+        assertValidShape(
+            {
+                value: 'hi',
+            } satisfies typeof withAnyOf.runtimeType,
+            withAnyOf,
+        );
+        assertValidShape(
+            {
+                value: 1,
+            } satisfies typeof withAnyOf.runtimeType,
+            withAnyOf,
+        );
+        assertValidShape(
+            {
+                value: {},
+            } satisfies typeof withAnyOf.runtimeType,
+            withAnyOf,
+        );
+        assertValidShape(
+            {
+                value: {
+                    hello: 'there',
+                },
+            } satisfies typeof withAnyOf.runtimeType,
+            withAnyOf,
+        );
+    });
 
     it('fails on invalid definition', () => {
         assert.throws(() =>
