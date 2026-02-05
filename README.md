@@ -112,7 +112,7 @@ schemas.versions;
 schemas.Version;
 
 // Find the schema and version that the given object matches (if any).
-schemas.matchValue({
+schemas.assertWrapMatch({
     schemaVersion: 'v2',
     data: {
         value: 10,

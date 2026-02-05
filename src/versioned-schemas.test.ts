@@ -109,19 +109,19 @@ describe(defineVersionedSchemaSuite.name, () => {
             v3: typeof mockV3Schema.schemaShape.runtimeType;
         }>();
 
-        /** Testing `.findMatch()` */
+        /** Testing `.assertWrapMatch()` */
         assert.isDefined(
-            mockVersionedSchemaSuite.matchValue({
+            mockVersionedSchemaSuite.assertWrapMatch({
                 schemaVersion: 'v1',
                 topProp: {
                     secondProp: {},
                 },
             } satisfies (typeof mockVersionedSchemaSuite.VersionedValueType)['v1']),
-            '.findMatch match mismatch',
+            '.assertWrapMatch match mismatch',
         );
         assert.throws(
             () =>
-                mockVersionedSchemaSuite.matchValue({
+                mockVersionedSchemaSuite.assertWrapMatch({
                     schemaVersion: 'v99',
                     topProp: {
                         secondProp: {},
@@ -133,7 +133,7 @@ describe(defineVersionedSchemaSuite.name, () => {
         );
         assert.throws(
             () =>
-                mockVersionedSchemaSuite.matchValue({
+                mockVersionedSchemaSuite.assertWrapMatch({
                     topProp: {
                         secondProp: {},
                     },
@@ -144,7 +144,7 @@ describe(defineVersionedSchemaSuite.name, () => {
         );
         assert.throws(
             () =>
-                mockVersionedSchemaSuite.matchValue({
+                mockVersionedSchemaSuite.assertWrapMatch({
                     schemaVersion: 'v1',
                     topProp: {
                         wrongProp: {},

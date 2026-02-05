@@ -1,7 +1,7 @@
 import {assert} from '@augment-vir/assert';
 import {mapObject, mapObjectValues, type AnyObject, type Values} from '@augment-vir/common';
 import {type VersionMap} from './versioned-schema-types.js';
-import {matchValue, type VersionedSchemaSuiteObject} from './versioned-schemas.js';
+import {assertWrapMatch, type VersionedSchemaSuiteObject} from './versioned-schemas.js';
 
 /**
  * An individually defined schema mapper, output from `SchemaMapperSuite.defineMapper`.
@@ -234,7 +234,7 @@ export function mapSchema<const Versions extends VersionMap<any>, MapOutput, Con
         ? [value: Readonly<AnyObject>, context?: Context]
         : [value: Readonly<AnyObject>, context: Context]
 ): MapOutput {
-    const schemaMatch = matchValue<Versions>(versions, value);
+    const schemaMatch = assertWrapMatch<Versions>(versions, value);
 
     const mapper = mappers[schemaMatch.version].mapper;
 

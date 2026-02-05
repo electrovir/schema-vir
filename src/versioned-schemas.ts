@@ -61,7 +61,7 @@ export function defineVersionedSchema<
  * - A type (do not use at runtime) that maps each available version to its schema value
  *   (`.VersionedValueType`).
  * - A function that matches a raw value instance to its corresponding schema version
- *   (`.findMatch()`).
+ *   (`.assertWrapMatch()`).
  *
  * @category Main
  */
@@ -103,8 +103,8 @@ export function defineVersionedSchemaSuite<
         originalVersionedSchemas: versionedSchemas,
         versions,
         Version,
-        matchValue(value) {
-            return matchValue<VersionedSchemaSuiteObject<VersionedSchemas>['versions']>(
+        assertWrapMatch(value) {
+            return assertWrapMatch<VersionedSchemaSuiteObject<VersionedSchemas>['versions']>(
                 versions,
                 value,
             );
@@ -187,22 +187,20 @@ export type VersionedSchemaSuiteObject<VersionedSchemas extends Readonly<BaseVer
         [Version in keyof VersionMap<VersionedSchemas>]: VersionMap<VersionedSchemas>[Version]['schemaShape']['runtimeType'];
     };
     /** A function that matches a raw value instance to its corresponding schema version. */
-    matchValue: (
-        value: Readonly<AnyObject>,
-    ) => SchemaMatch<VersionMap<VersionedSchemas>> | undefined;
+    assertWrapMatch: (value: unknown) => SchemaMatch<VersionMap<VersionedSchemas>>;
 };
 
 /**
  * It is not recommended to use this directly. Instead, use
- * `defineVersionedSchemaSuite(schemas).findMatch()`.
+ * `defineVersionedSchemaSuite(schemas).assertWrapMatch()`.
  *
- * An external version of `VersionedSchemasObject.findMatch`.
+ * An external version of `VersionedSchemasObject.assertWrapMatch`.
  *
  * @category Internal
  */
-export function matchValue<const Versions extends Readonly<VersionMap<any>>>(
+export function assertWrapMatch<const Versions extends Readonly<VersionMap<any>>>(
     versions: Readonly<Versions>,
-    value: Readonly<AnyObject>,
+    value: unknown,
 ): SchemaMatch<Versions> {
     const matchedSchemas = Object.values(versions as Readonly<VersionMap<any>>).filter(
         ({version, versionPath}) => {

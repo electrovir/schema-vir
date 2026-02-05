@@ -27,8 +27,8 @@ export type VersionedSchema<
 export type BaseVersionedSchemas = Record<string, VersionedSchema>;
 
 /**
- * Output of `VersionedSchemasObject.findMatch`. Data and the schema version that it was matched
- * with.
+ * Output of `VersionedSchemasObject.assertWrapMatch`. Data and the schema version that it was
+ * matched with.
  *
  * @category Internal
  */
