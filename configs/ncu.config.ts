@@ -6,8 +6,6 @@ export const ncuConfig: RunOptions = {
     // exclude these
     reject: [
         ...baseNcuConfig.reject,
-        /** https://github.com/sindresorhus/eslint-plugin-unicorn/pull/2706 */
-        'eslint-plugin-unicorn',
     ],
     // include only these
     filter: [],
