@@ -219,7 +219,9 @@ export function assertWrapMatch<const Versions extends Readonly<VersionMap<any>>
 
     const matchedSchema = matchedSchemas[0];
 
-    assertValidShape(value, matchedSchema.schemaShape, {allowExtraKeys: true});
+    assertValidShape(value, matchedSchema.schemaShape, {
+        allowExtraKeys: true,
+    });
 
     return {
         value,

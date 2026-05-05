@@ -62,8 +62,14 @@ export type CollectedSchemaMappers<Versions extends VersionMap<any>, MapOutput, 
      */
     mapSchema: (
         ...params: Context extends undefined
-            ? [value: Readonly<AnyObject>, context?: Context]
-            : [value: Readonly<AnyObject>, context: Context]
+            ? [
+                  value: Readonly<AnyObject>,
+                  context?: Context,
+              ]
+            : [
+                  value: Readonly<AnyObject>,
+                  context: Context,
+              ]
     ) => MapOutput;
 };
 
@@ -231,8 +237,14 @@ export function mapSchema<const Versions extends VersionMap<any>, MapOutput, Con
         value,
         context,
     ]: Context extends undefined
-        ? [value: Readonly<AnyObject>, context?: Context]
-        : [value: Readonly<AnyObject>, context: Context]
+        ? [
+              value: Readonly<AnyObject>,
+              context?: Context,
+          ]
+        : [
+              value: Readonly<AnyObject>,
+              context: Context,
+          ]
 ): MapOutput {
     const schemaMatch = assertWrapMatch<Versions>(versions, value);
 

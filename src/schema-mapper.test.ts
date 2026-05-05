@@ -61,16 +61,40 @@ describe(defineSchemaMapperSuite.name, () => {
         const {mapSchema} = suite.collectMappers({
             mockV1Mapper: suite.defineMapper.v1(({context, value}) => {
                 assert.tsType(value).equals<{a: {b: 'v1'}}>();
-                assert.deepEquals(value, {a: {b: 'v1'}});
+                assert.deepEquals(value, {
+                    a: {
+                        b: 'v1',
+                    },
+                });
                 assert.tsType(context).equals<{context: number}>;
-                assert.deepEquals(context, {context: 1});
+                assert.deepEquals(context, {
+                    context: 1,
+                });
                 return 1;
             }),
         });
 
-        assert.strictEquals(mapSchema({a: {b: 'v1'}}, {context: 1}), 1);
-        // @ts-expect-error: intentionally missing required context input
-        assert.throws(() => mapSchema({a: {b: 'v1'}}));
+        assert.strictEquals(
+            mapSchema(
+                {
+                    a: {
+                        b: 'v1',
+                    },
+                },
+                {
+                    context: 1,
+                },
+            ),
+            1,
+        );
+        assert.throws(() =>
+            // @ts-expect-error: intentionally missing required context input
+            mapSchema({
+                a: {
+                    b: 'v1',
+                },
+            }),
+        );
     });
 
     it('maps', () => {

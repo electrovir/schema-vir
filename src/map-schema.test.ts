@@ -167,17 +167,34 @@ describe(mapSchemaToShape.name, () => {
                 {
                     type: 'object',
                     properties: {
-                        isNull: {type: 'null'},
-                        isInt: {type: 'integer'},
-                        isNumber: {type: 'number'},
-                        isBooleanWithDefault: {type: 'boolean', default: true},
-                        isBooleanWithoutDefault: {type: 'boolean'},
-                        isConst: {const: 'five'},
+                        isNull: {
+                            type: 'null',
+                        },
+                        isInt: {
+                            type: 'integer',
+                        },
+                        isNumber: {
+                            type: 'number',
+                        },
+                        isBooleanWithDefault: {
+                            type: 'boolean',
+                            default: true,
+                        },
+                        isBooleanWithoutDefault: {
+                            type: 'boolean',
+                        },
+                        isConst: {
+                            const: 'five',
+                        },
                         isArray: {
                             type: 'array',
                             items: [
-                                {type: 'string'},
-                                {type: 'number'},
+                                {
+                                    type: 'string',
+                                },
+                                {
+                                    type: 'number',
+                                },
                             ],
                         },
                     },

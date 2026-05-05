@@ -301,7 +301,10 @@ function recursiveSchemaToShape(
         } else if (schema.type === 'string') {
             return schema.default ?? '';
         } else if (schema.$ref) {
-            const refKey = removePrefix({value: schema.$ref, prefix: '#/$defs/'});
+            const refKey = removePrefix({
+                value: schema.$ref,
+                prefix: '#/$defs/',
+            });
 
             const definition = definitions[refKey];
 
