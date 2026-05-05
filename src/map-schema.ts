@@ -231,7 +231,21 @@ function recursiveSchemaToShape(
                       );
 
                       if (isPropertyOptional) {
-                          return optionalShape(unionShape(propertyShape, undefined));
+                          /**
+                           * Optional properties with no explicit `default` resolve to `undefined`
+                           * so the parent shape's `.default` omits them on serialization (matching
+                           * the `nullableShape` / `optionalShape` convention from
+                           * `object-shape-tester`). When the property schema does specify an
+                           * explicit `default`, that value is preserved by listing the inner shape
+                           * (whose default already reflects the explicit value) first in the
+                           * union.
+                           */
+                          const hasExplicitDefault =
+                              check.isObject(propertyValue) && 'default' in propertyValue;
+
+                          return hasExplicitDefault
+                              ? optionalShape(unionShape(propertyShape, undefined))
+                              : optionalShape(unionShape(undefined, propertyShape));
                       } else {
                           return propertyShape;
                       }

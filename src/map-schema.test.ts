@@ -50,11 +50,11 @@ describe(mapSchemaToShape.name, () => {
             expect: defineShape({
                 firstName: '',
                 lastName: '',
-                age: optionalShape(unionShape(-1, undefined)),
+                age: optionalShape(unionShape(undefined, -1)),
                 hairColor: optionalShape(
                     unionShape(
-                        unionShape(exactShape('black'), exactShape('brown'), exactShape('blue')),
                         undefined,
+                        unionShape(exactShape('black'), exactShape('brown'), exactShape('blue')),
                     ),
                 ),
             }),
@@ -184,13 +184,13 @@ describe(mapSchemaToShape.name, () => {
                 },
             ],
             expect: defineShape({
-                isNull: optionalShape(unionShape(null, undefined)),
-                isInt: optionalShape(unionShape(-1, undefined)),
-                isNumber: optionalShape(unionShape(-1, undefined)),
+                isNull: optionalShape(unionShape(undefined, null)),
+                isInt: optionalShape(unionShape(undefined, -1)),
+                isNumber: optionalShape(unionShape(undefined, -1)),
                 isBooleanWithDefault: optionalShape(unionShape(true, undefined)),
-                isBooleanWithoutDefault: optionalShape(unionShape(false, undefined)),
-                isConst: optionalShape(unionShape(exactShape('five'), undefined)),
-                isArray: optionalShape(unionShape([unionShape('', -1)], undefined)),
+                isBooleanWithoutDefault: optionalShape(unionShape(undefined, false)),
+                isConst: optionalShape(unionShape(undefined, exactShape('five'))),
+                isArray: optionalShape(unionShape(undefined, [unionShape('', -1)])),
             }),
         },
     ]);
@@ -498,10 +498,9 @@ describe(mapSchemaToShape.name, () => {
             }[];
         }>();
 
-        assert.deepEquals(withDefs.default, {
+        assert.deepEquals(JSON.parse(JSON.stringify(withDefs.default)), {
             basic: '',
             usesDef: [],
-            usesDef2: [],
         });
         assertValidShape(
             {
@@ -688,6 +687,97 @@ describe(mapSchemaToShape.name, () => {
         );
     });
 
+    it('omits optional properties without explicit defaults from .default', () => {
+        const schemaShape = mapSchemaToShape({
+            $schema: 'http://json-schema.org/draft-07/schema#',
+            type: 'object',
+            required: [
+                'requiredString',
+            ],
+            properties: {
+                requiredString: {
+                    type: 'string',
+                },
+                optionalString: {
+                    type: 'string',
+                },
+                optionalNumber: {
+                    type: 'number',
+                },
+                optionalBoolean: {
+                    type: 'boolean',
+                },
+                optionalNullableObject: {
+                    anyOf: [
+                        {
+                            type: 'object',
+                            properties: {
+                                enabled: {
+                                    type: 'boolean',
+                                },
+                            },
+                            required: [
+                                'enabled',
+                            ],
+                            additionalProperties: false,
+                        },
+                        {
+                            type: 'null',
+                        },
+                    ],
+                },
+                optionalNullableBoolean: {
+                    type: [
+                        'boolean',
+                        'null',
+                    ],
+                },
+            },
+        });
+
+        assert.deepEquals(JSON.parse(JSON.stringify(schemaShape.default)), {
+            requiredString: '',
+        });
+        assert.strictEquals(schemaShape.default.optionalString, undefined);
+        assert.strictEquals(schemaShape.default.optionalNumber, undefined);
+        assert.strictEquals(schemaShape.default.optionalBoolean, undefined);
+        assert.strictEquals(schemaShape.default.optionalNullableObject, undefined);
+        assert.strictEquals(schemaShape.default.optionalNullableBoolean, undefined);
+    });
+    it('honors explicit defaults on optional properties', () => {
+        const schemaShape = mapSchemaToShape({
+            $schema: 'http://json-schema.org/draft-07/schema#',
+            type: 'object',
+            properties: {
+                optionalBooleanWithDefault: {
+                    type: 'boolean',
+                    default: true,
+                },
+                optionalNumberWithDefault: {
+                    type: 'number',
+                    default: 5,
+                },
+                optionalStringWithDefault: {
+                    type: 'string',
+                    default: 'hi',
+                },
+                optionalMultiTypeWithDefault: {
+                    type: [
+                        'boolean',
+                        'null',
+                    ],
+                    default: false,
+                },
+            },
+        });
+
+        assert.deepEquals(schemaShape.default, {
+            optionalBooleanWithDefault: true,
+            optionalNumberWithDefault: 5,
+            optionalStringWithDefault: 'hi',
+            optionalMultiTypeWithDefault: false,
+        });
+    });
     it('works without required fields', () => {
         const schemaShape = mapSchemaToShape({
             $schema: 'http://json-schema.org/draft-07/schema#',

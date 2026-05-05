@@ -157,24 +157,38 @@ describe(defineVersionedSchemaSuite.name, () => {
     });
 
     it('errors on optional schema version', () => {
-        const result = defineVersionedSchemaSuite({
-            mockV1Schema,
-            optionalVersionMockSchema,
-        });
+        assert.throws(
+            () => {
+                const result = defineVersionedSchemaSuite({
+                    mockV1Schema,
+                    optionalVersionMockSchema,
+                });
 
-        assert
-            .tsType(result)
-            .equals<'ERROR: Invalid schema: optional or non-const version detected.'>();
+                assert
+                    .tsType(result)
+                    .equals<'ERROR: Invalid schema: optional or non-const version detected.'>();
+            },
+            {
+                matchMessage: 'Failed to extract schema version',
+            },
+        );
     });
     it('errors on non-const schema version', () => {
-        const result = defineVersionedSchemaSuite({
-            mockV1Schema,
-            nonConstVersionMock,
-        });
+        assert.throws(
+            () => {
+                const result = defineVersionedSchemaSuite({
+                    mockV1Schema,
+                    nonConstVersionMock,
+                });
 
-        assert
-            .tsType(result)
-            .equals<'ERROR: Invalid schema: optional or non-const version detected.'>();
+                assert
+                    .tsType(result)
+                    .equals<'ERROR: Invalid schema: optional or non-const version detected.'>();
+            },
+            {
+                matchMessage: 'Failed to extract schema version',
+            },
+        );
     });
     it('errors on missing schema path', () => {
         assert.throws(
@@ -194,14 +208,21 @@ describe(defineVersionedSchemaSuite.name, () => {
         );
     });
     it('errors on invalid schema version path', () => {
-        const result = defineVersionedSchemaSuite({
-            mockV1Schema,
-            nonConstVersionMock,
-        });
+        assert.throws(
+            () => {
+                const result = defineVersionedSchemaSuite({
+                    mockV1Schema,
+                    nonConstVersionMock,
+                });
 
-        assert
-            .tsType(result)
-            .equals<'ERROR: Invalid schema: optional or non-const version detected.'>();
+                assert
+                    .tsType(result)
+                    .equals<'ERROR: Invalid schema: optional or non-const version detected.'>();
+            },
+            {
+                matchMessage: 'Failed to extract schema version',
+            },
+        );
     });
     it('errors on duplicate versions', () => {
         assert.throws(
