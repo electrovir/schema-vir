@@ -411,7 +411,7 @@ describe(mapSchemaToShape.name, () => {
 
         assert.tsType<typeof withDefs.runtimeType>().equals<{
             basic: string;
-            usesDef: {text: string; page_numbers?: number[]}[];
+            usesDef: {text: string; page_numbers?: number[] | undefined}[];
         }>();
 
         assert.deepEquals(withDefs.default, {
@@ -501,18 +501,24 @@ describe(mapSchemaToShape.name, () => {
             basic: string;
             usesDef: {
                 text: string;
-                nested_items?: {
-                    text: string;
-                    page_numbers?: number[];
-                }[];
+                nested_items?:
+                    | {
+                          text: string;
+                          page_numbers?: number[] | undefined;
+                      }[]
+                    | undefined;
             }[];
-            usesDef2?: {
-                text: string;
-                nested_items?: {
-                    text: string;
-                    page_numbers?: number[];
-                }[];
-            }[];
+            usesDef2?:
+                | {
+                      text: string;
+                      nested_items?:
+                          | {
+                                text: string;
+                                page_numbers?: number[] | undefined;
+                            }[]
+                          | undefined;
+                  }[]
+                | undefined;
         }>();
 
         assert.deepEquals(JSON.parse(JSON.stringify(withDefs.default)), {
@@ -601,7 +607,7 @@ describe(mapSchemaToShape.name, () => {
             basic: string;
             usesDef: {
                 text: string | number;
-                page_numbers?: number[];
+                page_numbers?: number[] | undefined;
             }[];
         }>();
 
@@ -842,9 +848,11 @@ describe(mapSchemaToShape.name, () => {
 
         assert.tsType<typeof schemaShape.runtimeType.topProp.secondProp>().notEquals<unknown>();
         assert.tsType<typeof schemaShape.runtimeType.topProp.secondProp>().equals<{
-            thirdProp?: {
-                threeA: string;
-            }[];
+            thirdProp?:
+                | {
+                      threeA: string;
+                  }[]
+                | undefined;
         }>();
     });
 });

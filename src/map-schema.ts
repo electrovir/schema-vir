@@ -49,6 +49,32 @@ export type SchemaShapeOptions = Omit<FromSchemaOptions, 'keepDefaultedPropertie
     }>;
 
 /**
+ * Recursively adds `| undefined` to every optional property in a type. `json-schema-to-ts` emits
+ * optional properties as `key?: T` which, under `exactOptionalPropertyTypes`, forbids an explicit
+ * `undefined` value. The runtime shapes produced here explicitly allow `undefined` for optional
+ * properties (via `optionalShape(unionShape(undefined, ...))`), so the generated type must match by
+ * allowing `undefined` as well.
+ *
+ * @category Internal
+ */
+export type DeepOptionalUndefined<T> =
+    T extends ReadonlyArray<any>
+        ? {
+              [Index in keyof T]: DeepOptionalUndefined<T[Index]>;
+          }
+        : T extends object
+          ? string extends keyof T
+              ? {
+                    [Key in keyof T]: DeepOptionalUndefined<T[Key]>;
+                }
+              : {
+                    [Key in keyof T]: object extends Pick<T, Key>
+                        ? DeepOptionalUndefined<T[Key]> | undefined
+                        : DeepOptionalUndefined<T[Key]>;
+                }
+          : T;
+
+/**
  * Converts a JSON Schema type to its equivalent TypeScript type.
  *
  * @category Internal
@@ -56,9 +82,11 @@ export type SchemaShapeOptions = Omit<FromSchemaOptions, 'keepDefaultedPropertie
 export type SchemaShapeToType<
     Schema extends JSONSchema,
     Options extends SchemaShapeOptions,
-> = FromSchema<
-    Extract<MapSchema<Schema, Options>, JSONSchema>,
-    Options & {keepDefaultedPropertiesOptional: true}
+> = DeepOptionalUndefined<
+    FromSchema<
+        Extract<MapSchema<Schema, Options>, JSONSchema>,
+        Options & {keepDefaultedPropertiesOptional: true}
+    >
 >;
 
 /**
