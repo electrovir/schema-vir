@@ -9,6 +9,7 @@ import {
     stringify,
     typedMap,
 } from '@augment-vir/common';
+import {type TObject, type TOptional, type TUnsafe} from '@sinclair/typebox';
 import {
     type FromSchema,
     type FromSchemaDefaultOptions,
@@ -155,6 +156,31 @@ export type MapSchemaInternal<
     : Schema;
 
 /**
+ * Builds a TypeBox schema _type_ from a fully-resolved runtime type so that object-shape-tester
+ * combinators (`pickShape`, `omitShape`, `partialShape`, etc.) can read a real object schema off of
+ * a mapped shape's `$_schema`. Without this, `mapSchemaToShape`'s result carries the bare `Shape`'s
+ * `$_schema` (which is `any`), so every combinator collapses to `unknown`.
+ *
+ * Each object property is wrapped in `TUnsafe` (preserving the resolved property type verbatim) and
+ * optional properties are additionally wrapped in `TOptional` so that `Static` reconstructs the
+ * original optionality. Arrays, records, and primitives are passed through `TUnsafe` whole, since
+ * combinators only ever operate on top-level object keys.
+ *
+ * @category Internal
+ */
+export type RuntimeTypeToSchema<Type> = [Type] extends [ReadonlyArray<any>]
+    ? TUnsafe<Type>
+    : [Type] extends [object]
+      ? string extends keyof Type
+          ? TUnsafe<Type>
+          : TObject<{
+                [Key in keyof Type]-?: object extends Pick<Type, Key>
+                    ? TOptional<TUnsafe<Type[Key]>>
+                    : TUnsafe<Type[Key]>;
+            }>
+      : TUnsafe<Type>;
+
+/**
  * Maps a schema and options to a shape definition with the schema's mapped type.
  *
  * @category Internal
@@ -166,6 +192,9 @@ export type SchemaShape<Schema extends JSONSchema, Options extends SchemaShapeOp
               {
                   runtimeType: ShapeType;
                   default: ShapeType;
+                  $_schema: RuntimeTypeToSchema<ShapeType>;
+                  $_schemaNoExtraKeys: RuntimeTypeToSchema<ShapeType>;
+                  $_schemaExtraKeys: RuntimeTypeToSchema<ShapeType>;
               }
           >
         : never;

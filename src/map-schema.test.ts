@@ -1,14 +1,20 @@
 import {assert} from '@augment-vir/assert';
 import {describe, it, itCases} from '@augment-vir/test';
+import {type Static} from '@sinclair/typebox';
 import {
     assertValidShape,
     defineShape,
     exactShape,
     optionalShape,
+    partialShape,
+    pickShape,
     recordShape,
     unionShape,
 } from 'object-shape-tester';
-import {mapSchemaToShape, type SchemaShapeOptions} from './map-schema.js';
+import {mapSchemaToShape, type RuntimeTypeToSchema, type SchemaShapeOptions} from './map-schema.js';
+
+/** A type-level identity probe: `Static<RuntimeTypeToSchema<T>>` should reconstruct `T` exactly. */
+type RoundTrip<T> = Static<RuntimeTypeToSchema<T>>;
 
 /** Test mock schema validity here: https://borischerny.com/json-schema-to-typescript-browser */
 
@@ -854,5 +860,432 @@ describe(mapSchemaToShape.name, () => {
                   }[]
                 | undefined;
         }>();
+    });
+});
+
+describe(`${mapSchemaToShape.name} + pickShape`, () => {
+    const settingsSchema = {
+        $schema: 'http://json-schema.org/draft-07/schema#',
+        type: 'object',
+        properties: {
+            id: {
+                type: 'string',
+            },
+            retries: {
+                type: 'number',
+                default: 3,
+            },
+            banner: {
+                type: 'object',
+                default: {
+                    visible: false,
+                    label: 'none',
+                },
+                properties: {
+                    visible: {
+                        type: 'boolean',
+                        default: false,
+                    },
+                    label: {
+                        type: 'string',
+                        default: 'none',
+                    },
+                },
+                required: [
+                    'visible',
+                    'label',
+                ],
+            },
+        },
+        required: [
+            'id',
+        ],
+    } as const;
+
+    it('picks a required scalar property', () => {
+        const idShape = pickShape(mapSchemaToShape(settingsSchema), {
+            id: true,
+        });
+
+        assert.tsType<typeof idShape.runtimeType>().equals<{
+            id: string;
+        }>();
+
+        assertValidShape(
+            {
+                id: 'abc',
+            } satisfies typeof idShape.runtimeType,
+            idShape,
+        );
+    });
+
+    it('picks an optional object property and preserves its optionality', () => {
+        const bannerShape = pickShape(mapSchemaToShape(settingsSchema), {
+            banner: true,
+        });
+
+        assert.tsType<typeof bannerShape.runtimeType>().notEquals<unknown>();
+        assert.tsType<typeof bannerShape.runtimeType>().equals<{
+            banner?:
+                | {
+                      visible: boolean;
+                      label: string;
+                  }
+                | undefined;
+        }>();
+
+        assertValidShape(
+            {
+                banner: {
+                    visible: true,
+                    label: 'down for maintenance',
+                },
+            } satisfies typeof bannerShape.runtimeType,
+            bannerShape,
+        );
+        assertValidShape({} satisfies typeof bannerShape.runtimeType, bannerShape);
+    });
+});
+
+describe('RuntimeTypeToSchema', () => {
+    it('round-trips an object of required scalars', () => {
+        assert
+            .tsType<
+                RoundTrip<{
+                    name: string;
+                    count: number;
+                    enabled: boolean;
+                }>
+            >()
+            .equals<{
+                name: string;
+                count: number;
+                enabled: boolean;
+            }>();
+    });
+
+    it('round-trips an object of optional scalars', () => {
+        assert
+            .tsType<
+                RoundTrip<{
+                    name?: string | undefined;
+                    count?: number | undefined;
+                    enabled?: boolean | undefined;
+                }>
+            >()
+            .equals<{
+                name?: string | undefined;
+                count?: number | undefined;
+                enabled?: boolean | undefined;
+            }>();
+    });
+
+    it('round-trips a mix of required and optional properties', () => {
+        assert
+            .tsType<
+                RoundTrip<{
+                    requiredString: string;
+                    optionalNumber?: number | undefined;
+                    requiredBoolean: boolean;
+                    optionalString?: string | undefined;
+                }>
+            >()
+            .equals<{
+                requiredString: string;
+                optionalNumber?: number | undefined;
+                requiredBoolean: boolean;
+                optionalString?: string | undefined;
+            }>();
+    });
+
+    it('round-trips a required nested object verbatim', () => {
+        assert
+            .tsType<
+                RoundTrip<{
+                    nested: {
+                        inner: string;
+                        innerOptional?: number | undefined;
+                    };
+                }>
+            >()
+            .equals<{
+                nested: {
+                    inner: string;
+                    innerOptional?: number | undefined;
+                };
+            }>();
+    });
+
+    it('round-trips an optional nested object verbatim', () => {
+        assert
+            .tsType<
+                RoundTrip<{
+                    nested?:
+                        | {
+                              inner: string;
+                          }
+                        | undefined;
+                }>
+            >()
+            .equals<{
+                nested?:
+                    | {
+                          inner: string;
+                      }
+                    | undefined;
+            }>();
+    });
+
+    it('round-trips array properties', () => {
+        assert
+            .tsType<
+                RoundTrip<{
+                    scalars: string[];
+                    objects: {x: number}[];
+                    optionalArray?: boolean[] | undefined;
+                }>
+            >()
+            .equals<{
+                scalars: string[];
+                objects: {x: number}[];
+                optionalArray?: boolean[] | undefined;
+            }>();
+    });
+
+    it('round-trips a record property', () => {
+        assert
+            .tsType<
+                RoundTrip<{
+                    map: Record<string, string>;
+                    unknownMap: Record<string, unknown>;
+                }>
+            >()
+            .equals<{
+                map: Record<string, string>;
+                unknownMap: Record<string, unknown>;
+            }>();
+    });
+
+    it('round-trips union and literal-union properties', () => {
+        assert
+            .tsType<
+                RoundTrip<{
+                    union: string | number;
+                    literals: 'red' | 'green' | 'blue';
+                    nullable: string | null;
+                    optionalUnion?: string | number | undefined;
+                }>
+            >()
+            .equals<{
+                union: string | number;
+                literals: 'red' | 'green' | 'blue';
+                nullable: string | null;
+                optionalUnion?: string | number | undefined;
+            }>();
+    });
+
+    it('round-trips a null property', () => {
+        assert
+            .tsType<
+                RoundTrip<{
+                    nothing: null;
+                }>
+            >()
+            .equals<{
+                nothing: null;
+            }>();
+    });
+
+    it('round-trips deeply nested optionality verbatim', () => {
+        assert
+            .tsType<
+                RoundTrip<{
+                    a: {
+                        b: {
+                            c?: string | undefined;
+                            d: number[];
+                        };
+                    };
+                }>
+            >()
+            .equals<{
+                a: {
+                    b: {
+                        c?: string | undefined;
+                        d: number[];
+                    };
+                };
+            }>();
+    });
+
+    it('round-trips a top-level array', () => {
+        assert.tsType<RoundTrip<string[]>>().equals<string[]>();
+        assert.tsType<RoundTrip<{x: number}[]>>().equals<{x: number}[]>();
+    });
+
+    it('round-trips a top-level record', () => {
+        assert.tsType<RoundTrip<Record<string, number>>>().equals<Record<string, number>>();
+    });
+
+    it('round-trips top-level primitives', () => {
+        assert.tsType<RoundTrip<string>>().equals<string>();
+        assert.tsType<RoundTrip<number>>().equals<number>();
+        assert.tsType<RoundTrip<boolean>>().equals<boolean>();
+        assert.tsType<RoundTrip<null>>().equals<null>();
+    });
+
+    it('matches the runtime type produced by mapSchemaToShape', () => {
+        const schemaShape = mapSchemaToShape({
+            $schema: 'http://json-schema.org/draft-07/schema#',
+            type: 'object',
+            required: [
+                'id',
+            ],
+            properties: {
+                id: {
+                    type: 'string',
+                },
+                age: {
+                    type: 'number',
+                },
+                tags: {
+                    type: 'array',
+                    items: {
+                        type: 'string',
+                    },
+                },
+            },
+        });
+
+        assert
+            .tsType<RoundTrip<typeof schemaShape.runtimeType>>()
+            .equals<typeof schemaShape.runtimeType>();
+    });
+});
+
+describe(`${mapSchemaToShape.name} + partialShape`, () => {
+    const userSchema = {
+        $schema: 'http://json-schema.org/draft-07/schema#',
+        type: 'object',
+        required: [
+            'id',
+            'name',
+        ],
+        properties: {
+            id: {
+                type: 'string',
+            },
+            name: {
+                type: 'string',
+            },
+            nickname: {
+                type: 'string',
+            },
+        },
+    } as const;
+
+    it('makes every property optional', () => {
+        const partial = partialShape(mapSchemaToShape(userSchema));
+
+        assert.tsType<typeof partial.runtimeType>().notEquals<unknown>();
+        assert.tsType<typeof partial.runtimeType>().equals<{
+            id?: string;
+            name?: string;
+            nickname?: string | undefined;
+        }>();
+
+        assertValidShape({} satisfies typeof partial.runtimeType, partial);
+        assertValidShape(
+            {
+                id: 'abc',
+            } satisfies typeof partial.runtimeType,
+            partial,
+        );
+        assertValidShape(
+            {
+                id: 'abc',
+                name: 'name',
+                nickname: 'nick',
+            } satisfies typeof partial.runtimeType,
+            partial,
+        );
+    });
+});
+
+describe(`${mapSchemaToShape.name} + pickShape extras`, () => {
+    const recordSchema = {
+        $schema: 'http://json-schema.org/draft-07/schema#',
+        type: 'object',
+        required: [
+            'id',
+            'name',
+        ],
+        properties: {
+            id: {
+                type: 'string',
+            },
+            name: {
+                type: 'string',
+            },
+            score: {
+                type: 'number',
+            },
+            tags: {
+                type: 'array',
+                items: {
+                    type: 'string',
+                },
+            },
+        },
+    } as const;
+
+    it('picks multiple properties and preserves each optionality', () => {
+        const picked = pickShape(mapSchemaToShape(recordSchema), {
+            id: true,
+            score: true,
+            tags: true,
+        });
+
+        assert.tsType<typeof picked.runtimeType>().equals<{
+            id: string;
+            score?: number | undefined;
+            tags?: string[] | undefined;
+        }>();
+
+        assertValidShape(
+            {
+                id: 'abc',
+                score: 5,
+                tags: [
+                    'a',
+                    'b',
+                ],
+            } satisfies typeof picked.runtimeType,
+            picked,
+        );
+        assertValidShape(
+            {
+                id: 'abc',
+            } satisfies typeof picked.runtimeType,
+            picked,
+        );
+    });
+
+    it('picks a single optional scalar property', () => {
+        const picked = pickShape(mapSchemaToShape(recordSchema), {
+            score: true,
+        });
+
+        assert.tsType<typeof picked.runtimeType>().equals<{
+            score?: number | undefined;
+        }>();
+
+        assertValidShape({} satisfies typeof picked.runtimeType, picked);
+        assertValidShape(
+            {
+                score: 10,
+            } satisfies typeof picked.runtimeType,
+            picked,
+        );
     });
 });
