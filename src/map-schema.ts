@@ -37,7 +37,7 @@ export type {
  *
  * @category Internal
  */
-export type SchemaShapeOptions = FromSchemaOptions &
+export type SchemaShapeOptions = Omit<FromSchemaOptions, 'keepDefaultedPropertiesOptional'> &
     PartialWithUndefined<{
         /**
          * Allows additional properties in the schema. By default, (when this is `false`) additional
@@ -56,7 +56,10 @@ export type SchemaShapeOptions = FromSchemaOptions &
 export type SchemaShapeToType<
     Schema extends JSONSchema,
     Options extends SchemaShapeOptions,
-> = FromSchema<Extract<MapSchema<Schema, Options>, JSONSchema>, Options>;
+> = FromSchema<
+    Extract<MapSchema<Schema, Options>, JSONSchema>,
+    Options & {keepDefaultedPropertiesOptional: true}
+>;
 
 /**
  * Maps the schema for definitions.
@@ -147,7 +150,10 @@ export type SchemaShape<Schema extends JSONSchema, Options extends SchemaShapeOp
  */
 export function mapSchemaToShape<
     const Schema extends JSONSchema,
-    const Options extends SchemaShapeOptions = FromSchemaDefaultOptions,
+    const Options extends SchemaShapeOptions = Omit<
+        FromSchemaDefaultOptions,
+        'keepDefaultedPropertiesOptional'
+    >,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
 >(rawSchema: Schema, options?: Options): SchemaShape<Schema, Options> {
     return defineShape(

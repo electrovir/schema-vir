@@ -794,6 +794,13 @@ describe(mapSchemaToShape.name, () => {
             optionalStringWithDefault: 'hi',
             optionalMultiTypeWithDefault: false,
         });
+
+        assert.tsType<typeof schemaShape.runtimeType>().equals<{
+            optionalBooleanWithDefault?: boolean | undefined;
+            optionalNumberWithDefault?: number | undefined;
+            optionalStringWithDefault?: string | undefined;
+            optionalMultiTypeWithDefault?: boolean | null | undefined;
+        }>();
     });
     it('works without required fields', () => {
         const schemaShape = mapSchemaToShape({
