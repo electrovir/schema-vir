@@ -1,6 +1,6 @@
 {
     "name": "schema-vir",
-    "version": "0.7.3",
+    "version": "0.8.0",
     "description": "Heroic schema mappers.",
     "keywords": [
         "JSON Schema",

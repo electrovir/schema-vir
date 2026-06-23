@@ -12,6 +12,7 @@ import {
     unionShape,
 } from 'object-shape-tester';
 import {mapSchemaToShape, type RuntimeTypeToSchema, type SchemaShapeOptions} from './map-schema.js';
+import {hugeSchema} from './map-schema.mock.js';
 
 /** A type-level identity probe: `Static<RuntimeTypeToSchema<T>>` should reconstruct `T` exactly. */
 type RoundTrip<T> = Static<RuntimeTypeToSchema<T>>;
@@ -716,6 +717,269 @@ describe(mapSchemaToShape.name, () => {
         );
     });
 
+    it('resolves a JSON Pointer $ref into another part of the document', () => {
+        const withPointer = mapSchemaToShape({
+            $schema: 'http://json-schema.org/draft-07/schema#',
+            type: 'object',
+            required: [
+                'episodes',
+                'legacyEpisodes',
+            ],
+            properties: {
+                episodes: {
+                    type: 'array',
+                    items: {
+                        type: 'object',
+                        required: [
+                            'text',
+                        ],
+                        properties: {
+                            text: {
+                                type: 'string',
+                            },
+                        },
+                    },
+                },
+                legacyEpisodes: {
+                    type: 'array',
+                    items: {
+                        $ref: '#/properties/episodes/items',
+                    },
+                },
+            },
+        });
+
+        assert.tsType<typeof withPointer.runtimeType>().notEquals<unknown>();
+        assert.tsType<typeof withPointer.runtimeType>().equals<{
+            episodes: {text: string}[];
+            legacyEpisodes: {text: string}[];
+        }>();
+
+        assertValidShape(
+            {
+                episodes: [
+                    {
+                        text: 'a',
+                    },
+                ],
+                legacyEpisodes: [
+                    {
+                        text: 'b',
+                    },
+                ],
+            } satisfies typeof withPointer.runtimeType,
+            withPointer,
+        );
+        assert.throws(() =>
+            assertValidShape(
+                {
+                    episodes: [],
+                    legacyEpisodes: [
+                        {
+                            text: 5,
+                        },
+                    ],
+                },
+                withPointer,
+            ),
+        );
+    });
+
+    it('resolves a legacy #/definitions/ $ref', () => {
+        const withDefinitions = mapSchemaToShape({
+            $schema: 'http://json-schema.org/draft-07/schema#',
+            type: 'object',
+            required: [
+                'usesDef',
+            ],
+            definitions: {
+                item: {
+                    type: 'object',
+                    required: [
+                        'text',
+                    ],
+                    properties: {
+                        text: {
+                            type: 'string',
+                        },
+                    },
+                },
+            },
+            properties: {
+                usesDef: {
+                    type: 'array',
+                    items: {
+                        $ref: '#/definitions/item',
+                    },
+                },
+            },
+        });
+
+        assert.tsType<typeof withDefinitions.runtimeType>().notEquals<unknown>();
+        assert.tsType<typeof withDefinitions.runtimeType>().equals<{
+            usesDef: {text: string}[];
+        }>();
+
+        assertValidShape(
+            {
+                usesDef: [
+                    {
+                        text: 'hi',
+                    },
+                ],
+            } satisfies typeof withDefinitions.runtimeType,
+            withDefinitions,
+        );
+    });
+
+    it('fails on an unresolvable JSON Pointer $ref', () => {
+        assert.throws(() =>
+            mapSchemaToShape({
+                $schema: 'http://json-schema.org/draft-07/schema#',
+                type: 'object',
+                properties: {
+                    usesDef: {
+                        type: 'array',
+                        items: {
+                            $ref: '#/properties/missing/items',
+                        },
+                    },
+                },
+            }),
+        );
+    });
+
+    it('fails on a non-local (external) $ref', () => {
+        assert.throws(
+            () =>
+                mapSchemaToShape({
+                    $schema: 'http://json-schema.org/draft-07/schema#',
+                    type: 'object',
+                    properties: {
+                        usesDef: {
+                            type: 'array',
+                            items: {
+                                $ref: 'https://example.com/schemas/item.json',
+                            },
+                        },
+                    },
+                }),
+            {
+                matchMessage: 'No definition found',
+            },
+        );
+    });
+
+    it('generates a valid type for a complex JSON Pointer $ref reused from multiple sites', () => {
+        const withReusedPointer = mapSchemaToShape({
+            $schema: 'http://json-schema.org/draft-07/schema#',
+            type: 'object',
+            required: [
+                'coverageHistory',
+            ],
+            properties: {
+                coverageHistory: {
+                    type: 'object',
+                    required: [
+                        'episodes',
+                    ],
+                    properties: {
+                        episodes: {
+                            type: 'array',
+                            items: {
+                                type: 'object',
+                                required: [
+                                    'episodeType',
+                                ],
+                                properties: {
+                                    episodeType: {
+                                        type: 'string',
+                                    },
+                                    daysCount: {
+                                        type: [
+                                            'integer',
+                                            'null',
+                                        ],
+                                    },
+                                    facility: {
+                                        type: 'object',
+                                        required: [
+                                            'name',
+                                        ],
+                                        properties: {
+                                            name: {
+                                                type: 'string',
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+                utilization: {
+                    type: 'array',
+                    items: {
+                        $ref: '#/properties/coverageHistory/properties/episodes/items',
+                    },
+                },
+                legacyEpisodes: {
+                    type: 'array',
+                    items: {
+                        $ref: '#/properties/coverageHistory/properties/episodes/items',
+                    },
+                },
+            },
+        });
+
+        type Episode = {
+            episodeType: string;
+            daysCount?: number | null | undefined;
+            facility?:
+                | {
+                      name: string;
+                  }
+                | undefined;
+        };
+
+        assert.tsType<typeof withReusedPointer.runtimeType>().notEquals<unknown>();
+        assert.tsType<typeof withReusedPointer.runtimeType>().equals<{
+            coverageHistory: {
+                episodes: Episode[];
+            };
+            utilization?: Episode[] | undefined;
+            legacyEpisodes?: Episode[] | undefined;
+        }>();
+
+        assertValidShape(
+            {
+                coverageHistory: {
+                    episodes: [
+                        {
+                            episodeType: 'Inpatient',
+                            daysCount: 5,
+                            facility: {
+                                name: 'Example Facility',
+                            },
+                        },
+                    ],
+                },
+                utilization: [
+                    {
+                        episodeType: 'Skilled Nursing',
+                        daysCount: null,
+                    },
+                ],
+                legacyEpisodes: [
+                    {
+                        episodeType: 'Hospice',
+                    },
+                ],
+            } satisfies typeof withReusedPointer.runtimeType,
+            withReusedPointer,
+        );
+    });
+
     it('omits optional properties without explicit defaults from .default', () => {
         const schemaShape = mapSchemaToShape({
             $schema: 'http://json-schema.org/draft-07/schema#',
@@ -1286,6 +1550,167 @@ describe(`${mapSchemaToShape.name} + pickShape extras`, () => {
                 score: 10,
             } satisfies typeof picked.runtimeType,
             picked,
+        );
+    });
+});
+
+describe(`${mapSchemaToShape.name} with a huge schema`, () => {
+    const hugeShape = mapSchemaToShape(hugeSchema);
+    type Report = (typeof hugeShape.runtimeType)['report'];
+
+    it('maps a huge, deeply nested schema without producing unknown', () => {
+        assert.tsType<typeof hugeShape.runtimeType>().notEquals<unknown>();
+        assert.tsType<Report>().notEquals<unknown>();
+    });
+
+    it('resolves a $ref to a $defs measurement into a concrete type', () => {
+        assert.tsType<Report['spacecraft']['mass_kg']>().notEquals<unknown>();
+        assert
+            .tsType<NonNullable<Report['spacecraft']['mass_kg']>['unit']>()
+            .equals<
+                | 'kelvin'
+                | 'pascal'
+                | 'meters_per_second'
+                | 'volts'
+                | 'amperes'
+                | 'kilograms'
+                | 'percent'
+            >();
+    });
+
+    it('resolves a $defs array item type (crew)', () => {
+        type CrewMember = NonNullable<Report['crew']>[number];
+        assert.tsType<CrewMember>().notEquals<unknown>();
+        assert
+            .tsType<CrewMember['role']>()
+            .equals<'commander' | 'pilot' | 'engineer' | 'scientist' | 'medic'>();
+    });
+
+    it('resolves a JSON Pointer $ref reused from another property (legacy_anomalies)', () => {
+        type Anomaly = NonNullable<Report['anomalies']>[number];
+        type LegacyAnomaly = NonNullable<Report['legacy_anomalies']>[number];
+        assert.tsType<LegacyAnomaly>().notEquals<unknown>();
+        assert.tsType<LegacyAnomaly>().equals<Anomaly>();
+        assert
+            .tsType<LegacyAnomaly['severity']>()
+            .equals<'info' | 'caution' | 'warning' | 'critical'>();
+    });
+
+    it('resolves legacy #/definitions/ $refs (subsystems and ground contacts)', () => {
+        type Subsystem = NonNullable<Report['subsystems']>[number];
+        assert.tsType<Subsystem>().notEquals<unknown>();
+        assert
+            .tsType<Subsystem['state']>()
+            .equals<'nominal' | 'standby' | 'degraded' | 'offline'>();
+
+        type GroundContact = NonNullable<Report['ground_contacts']>[number];
+        assert.tsType<GroundContact>().notEquals<unknown>();
+        assert.tsType<GroundContact['band']>().equals<'S' | 'X' | 'Ka' | undefined>();
+    });
+
+    it('validates a representative value against the huge shape at runtime', () => {
+        const value = {
+            report: {
+                schema_version: 'v1',
+                generated_at: '2026-01-01T00:00:00Z',
+                mission: {
+                    id: 'mission-1',
+                    name: 'Example Mission',
+                    phase: 'orbit',
+                },
+                spacecraft: {
+                    designation: 'EX-1',
+                    mass_kg: {
+                        value: 12_000,
+                        unit: 'kilograms',
+                    },
+                    propulsion: {
+                        mode: 'ion',
+                    },
+                    life_support: {
+                        cabin_pressure: {
+                            value: 101,
+                            unit: 'pascal',
+                        },
+                    },
+                    navigation: {
+                        reference_frame: 'inertial',
+                    },
+                },
+                crew: [
+                    {
+                        id: 'crew-1',
+                        name: 'Example Person',
+                        role: 'commander',
+                        vitals: {
+                            heart_rate: {
+                                value: 62,
+                                unit: 'percent',
+                            },
+                        },
+                    },
+                ],
+                anomalies: [
+                    {
+                        code: 'A-100',
+                        severity: 'caution',
+                    },
+                ],
+                legacy_anomalies: [
+                    {
+                        code: 'A-099',
+                        severity: 'info',
+                    },
+                ],
+                subsystems: [
+                    {
+                        name: 'thermal',
+                        state: 'nominal',
+                    },
+                ],
+                ground_contacts: [
+                    {
+                        station: 'Canberra',
+                        band: 'X',
+                    },
+                ],
+            },
+        } satisfies typeof hugeShape.runtimeType;
+
+        assertValidShape(value, hugeShape);
+    });
+
+    it('rejects a value that violates a deeply nested enum', () => {
+        assert.throws(() =>
+            assertValidShape(
+                {
+                    report: {
+                        schema_version: 'v1',
+                        generated_at: '2026-01-01T00:00:00Z',
+                        mission: {
+                            id: 'mission-1',
+                            name: 'Example Mission',
+                            phase: 'not_a_real_phase',
+                        },
+                        spacecraft: {
+                            designation: 'EX-1',
+                            propulsion: {
+                                mode: 'ion',
+                            },
+                            life_support: {
+                                cabin_pressure: {
+                                    value: 101,
+                                    unit: 'pascal',
+                                },
+                            },
+                            navigation: {
+                                reference_frame: 'inertial',
+                            },
+                        },
+                    },
+                },
+                hugeShape,
+            ),
         );
     });
 });

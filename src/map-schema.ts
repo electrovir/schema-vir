@@ -91,19 +91,33 @@ export type SchemaShapeToType<
 >;
 
 /**
- * Maps the schema for definitions.
+ * Maps the schemas nested inside both the `$defs` and the legacy `definitions` blocks so that
+ * `json-schema-to-ts` sees the transformed definition shapes when resolving `$ref`s that point into
+ * them.
  *
  * @category Internal
  */
-export type FixDefs<Schema, Options extends SchemaShapeOptions> = Schema extends {
-    $defs: infer Defs extends Record<string, JSONSchema>;
-}
-    ? Omit<Schema, '$defs'> & {
-          $defs: {
-              [DefKey in keyof Defs]: MapSchemaInternal<Defs[DefKey], Options>;
-          };
+export type FixDefs<Schema, Options extends SchemaShapeOptions> = (
+    Schema extends {
+        $defs: infer Defs extends Record<string, JSONSchema>;
+    }
+        ? Omit<Schema, '$defs'> & {
+              $defs: {
+                  [DefKey in keyof Defs]: MapSchemaInternal<Defs[DefKey], Options>;
+              };
+          }
+        : Schema
+) extends infer WithDefs
+    ? WithDefs extends {
+          definitions: infer Definitions extends Record<string, JSONSchema>;
       }
-    : Schema;
+        ? Omit<WithDefs, 'definitions'> & {
+              definitions: {
+                  [DefKey in keyof Definitions]: MapSchemaInternal<Definitions[DefKey], Options>;
+              };
+          }
+        : WithDefs
+    : never;
 
 /**
  * Maps the schema to inject some extra properties so that `json-schema-to-ts` will transform it the
@@ -214,8 +228,42 @@ export function mapSchemaToShape<
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
 >(rawSchema: Schema, options?: Options): SchemaShape<Schema, Options> {
     return defineShape(
-        recursiveSchemaToShape(rawSchema, [], {}, {}),
+        recursiveSchemaToShape(rawSchema, [], {}, {}, rawSchema as AnyObject),
     ) satisfies Shape as any as SchemaShape<Schema, Options>;
+}
+
+/**
+ * Decodes a single JSON Pointer reference token per RFC 6901: `~1` becomes `/` and `~0` becomes
+ * `~`. `~1` must be decoded before `~0` so that an encoded `~01` round-trips to `~1` rather than
+ * `/`.
+ */
+function decodeJsonPointerSegment(segment: string): string {
+    return segment.replaceAll('~1', '/').replaceAll('~0', '~');
+}
+
+/**
+ * Resolves a local JSON Pointer `$ref` (e.g. `#/properties/foo/items` or `#/definitions/bar`) by
+ * walking the pointer from the root schema document. Returns `undefined` when the ref is not a
+ * local pointer or the path does not resolve to a node.
+ */
+function resolveJsonPointer(rootSchema: AnyObject, ref: string): unknown {
+    if (!ref.startsWith('#/')) {
+        return undefined;
+    }
+
+    const segments = removePrefix({
+        value: ref,
+        prefix: '#/',
+    })
+        .split('/')
+        .map(decodeJsonPointerSegment);
+
+    return segments.reduce<unknown>((current, segment) => {
+        if (current == undefined || typeof current !== 'object') {
+            return undefined;
+        }
+        return (current as AnyObject)[segment];
+    }, rootSchema);
 }
 
 function recursiveSchemaToShape(
@@ -223,6 +271,7 @@ function recursiveSchemaToShape(
     keyChain: (string | number)[],
     parentDefinitions: AnyObject,
     definitionsShapeCache: AnyObject,
+    rootSchema: AnyObject,
 ): any {
     const keyChainString = keyChain.length ? keyChain.join('>') : 'Top level';
 
@@ -243,6 +292,7 @@ function recursiveSchemaToShape(
                         ],
                         parentDefinitions,
                         definitionsShapeCache,
+                        rootSchema,
                     ),
                 ),
             );
@@ -258,6 +308,7 @@ function recursiveSchemaToShape(
                         ],
                         parentDefinitions,
                         definitionsShapeCache,
+                        rootSchema,
                     ),
                 ),
             );
@@ -265,7 +316,7 @@ function recursiveSchemaToShape(
 
         const definitions: AnyObject = {
             ...parentDefinitions,
-            ...('$defs' in schema ? (schema.$defs as AnyObject) : {}),
+            ...('$defs' in schema && (schema.$defs as AnyObject)),
         };
 
         if (schema.type === 'array') {
@@ -274,7 +325,13 @@ function recursiveSchemaToShape(
             }
 
             return [
-                recursiveSchemaToShape(schema.items, keyChain, definitions, definitionsShapeCache),
+                recursiveSchemaToShape(
+                    schema.items,
+                    keyChain,
+                    definitions,
+                    definitionsShapeCache,
+                    rootSchema,
+                ),
             ];
         } else if (schema.type === 'object') {
             const requiredProperties: ReadonlyArray<string> = schema.required || [];
@@ -291,6 +348,7 @@ function recursiveSchemaToShape(
                           ],
                           definitions,
                           definitionsShapeCache,
+                          rootSchema,
                       );
 
                       if (isPropertyOptional) {
@@ -327,6 +385,7 @@ function recursiveSchemaToShape(
                                 ],
                                 definitions,
                                 definitionsShapeCache,
+                                rootSchema,
                             )
                           : unknownShape(),
                   })
@@ -364,29 +423,38 @@ function recursiveSchemaToShape(
         } else if (schema.type === 'string') {
             return schema.default ?? '';
         } else if (schema.$ref) {
-            const refKey = removePrefix({
+            if (schema.$ref in definitionsShapeCache) {
+                return definitionsShapeCache[schema.$ref];
+            }
+
+            /**
+             * `#/$defs/<key>` refs resolve against the merged `$defs` map (which includes nested
+             * `$defs` collected while descending). Any other local ref (a JSON Pointer like
+             * `#/properties/foo/items`, or the legacy `#/definitions/<key>` form) is resolved by
+             * walking the pointer from the root schema document.
+             */
+            const defsKey = removePrefix({
                 value: schema.$ref,
                 prefix: '#/$defs/',
             });
+            const resolvedSchema =
+                defsKey !== schema.$ref && defsKey in definitions
+                    ? definitions[defsKey]
+                    : resolveJsonPointer(rootSchema, schema.$ref);
 
-            const definition = definitions[refKey];
-
-            if (definition) {
-                if (refKey in definitionsShapeCache) {
-                    return definitionsShapeCache[refKey];
-                } else {
-                    const definitionShape = recursiveSchemaToShape(
-                        definition,
-                        keyChain,
-                        definitions,
-                        definitionsShapeCache,
-                    );
-                    definitionsShapeCache[refKey] = definitionShape;
-                    return definitionShape;
-                }
-            } else {
+            if (resolvedSchema == undefined) {
                 throw new Error(`No definition found for '${schema.$ref}'`);
             }
+
+            const resolvedShape = recursiveSchemaToShape(
+                resolvedSchema as JSONSchema,
+                keyChain,
+                definitions,
+                definitionsShapeCache,
+                rootSchema,
+            );
+            definitionsShapeCache[schema.$ref] = resolvedShape;
+            return resolvedShape;
         } else if (check.isArray(schema.type)) {
             const possibleSchemas = schema.type.map((individualType) => {
                 return recursiveSchemaToShape(
@@ -397,6 +465,7 @@ function recursiveSchemaToShape(
                     keyChain,
                     definitions,
                     definitionsShapeCache,
+                    rootSchema,
                 );
             });
 
