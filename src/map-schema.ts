@@ -228,7 +228,13 @@ export function mapSchemaToShape<
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
 >(rawSchema: Schema, options?: Options): SchemaShape<Schema, Options> {
     return defineShape(
-        recursiveSchemaToShape(rawSchema, [], {}, {}, rawSchema as AnyObject),
+        recursiveSchemaToShape({
+            rawSchema,
+            keyChain: [],
+            parentDefinitions: {},
+            definitionsShapeCache: {},
+            rootSchema: rawSchema as AnyObject,
+        }),
     ) satisfies Shape as any as SchemaShape<Schema, Options>;
 }
 
@@ -266,13 +272,19 @@ function resolveJsonPointer(rootSchema: AnyObject, ref: string): unknown {
     }, rootSchema);
 }
 
-function recursiveSchemaToShape(
-    rawSchema: JSONSchema | ReadonlyArray<JSONSchema>,
-    keyChain: (string | number)[],
-    parentDefinitions: AnyObject,
-    definitionsShapeCache: AnyObject,
-    rootSchema: AnyObject,
-): any {
+function recursiveSchemaToShape({
+    rawSchema,
+    keyChain,
+    parentDefinitions,
+    definitionsShapeCache,
+    rootSchema,
+}: Readonly<{
+    rawSchema: JSONSchema | ReadonlyArray<JSONSchema>;
+    keyChain: ReadonlyArray<string | number>;
+    parentDefinitions: AnyObject;
+    definitionsShapeCache: AnyObject;
+    rootSchema: AnyObject;
+}>): any {
     const keyChainString = keyChain.length ? keyChain.join('>') : 'Top level';
 
     const schema = rawSchema as JSONSchema | JSONSchema[];
@@ -284,32 +296,32 @@ function recursiveSchemaToShape(
             assert.isLengthAtLeast(schema, 1, 'Schema array is empty.');
             return unionShape(
                 ...typedMap(schema, (entry, index) =>
-                    recursiveSchemaToShape(
-                        entry,
-                        [
+                    recursiveSchemaToShape({
+                        rawSchema: entry,
+                        keyChain: [
                             ...keyChain,
                             index,
                         ],
                         parentDefinitions,
                         definitionsShapeCache,
                         rootSchema,
-                    ),
+                    }),
                 ),
             );
         } else if (check.isArray(schema.anyOf)) {
             assert.isLengthAtLeast(schema.anyOf, 1, 'Schema anyOf array is empty.');
             return unionShape(
                 ...typedMap(schema.anyOf, (entry, index) =>
-                    recursiveSchemaToShape(
-                        entry,
-                        [
+                    recursiveSchemaToShape({
+                        rawSchema: entry,
+                        keyChain: [
                             ...keyChain,
                             index,
                         ],
                         parentDefinitions,
                         definitionsShapeCache,
                         rootSchema,
-                    ),
+                    }),
                 ),
             );
         }
@@ -325,13 +337,13 @@ function recursiveSchemaToShape(
             }
 
             return [
-                recursiveSchemaToShape(
-                    schema.items,
+                recursiveSchemaToShape({
+                    rawSchema: schema.items,
                     keyChain,
-                    definitions,
+                    parentDefinitions: definitions,
                     definitionsShapeCache,
                     rootSchema,
-                ),
+                }),
             ];
         } else if (schema.type === 'object') {
             const requiredProperties: ReadonlyArray<string> = schema.required || [];
@@ -340,16 +352,16 @@ function recursiveSchemaToShape(
                 ? mapObjectValues(schema.properties, (key, propertyValue) => {
                       const isPropertyOptional = !requiredProperties.includes(key);
 
-                      const propertyShape = recursiveSchemaToShape(
-                          propertyValue,
-                          [
+                      const propertyShape = recursiveSchemaToShape({
+                          rawSchema: propertyValue,
+                          keyChain: [
                               ...keyChain,
                               key,
                           ],
-                          definitions,
+                          parentDefinitions: definitions,
                           definitionsShapeCache,
                           rootSchema,
-                      );
+                      });
 
                       if (isPropertyOptional) {
                           /**
@@ -377,16 +389,16 @@ function recursiveSchemaToShape(
                 ? recordShape({
                       keys: '',
                       values: check.isObject(schema.additionalProperties)
-                          ? recursiveSchemaToShape(
-                                schema.additionalProperties,
-                                [
+                          ? recursiveSchemaToShape({
+                                rawSchema: schema.additionalProperties,
+                                keyChain: [
                                     ...keyChain,
                                     'additionalProperties',
                                 ],
-                                definitions,
+                                parentDefinitions: definitions,
                                 definitionsShapeCache,
                                 rootSchema,
-                            )
+                            })
                           : unknownShape(),
                   })
                 : undefined;
@@ -411,9 +423,9 @@ function recursiveSchemaToShape(
                 throw new Error('Got an empty enum array.');
             } else if (schema.enum.some((value) => !check.isPrimitive(value))) {
                 throw new Error('Got a non primitive enum value.');
+            } else {
+                return unionShape(...typedMap(schema.enum, (value) => exactShape(value)));
             }
-
-            return unionShape(...typedMap(schema.enum, (value) => exactShape(value)));
         } else if (schema.type === 'boolean') {
             return schema.default ?? false;
         } else if (schema.type === 'integer' || schema.type === 'number') {
@@ -446,27 +458,27 @@ function recursiveSchemaToShape(
                 throw new Error(`No definition found for '${schema.$ref}'`);
             }
 
-            const resolvedShape = recursiveSchemaToShape(
-                resolvedSchema as JSONSchema,
+            const resolvedShape = recursiveSchemaToShape({
+                rawSchema: resolvedSchema as JSONSchema,
                 keyChain,
-                definitions,
+                parentDefinitions: definitions,
                 definitionsShapeCache,
                 rootSchema,
-            );
+            });
             definitionsShapeCache[schema.$ref] = resolvedShape;
             return resolvedShape;
         } else if (check.isArray(schema.type)) {
             const possibleSchemas = schema.type.map((individualType) => {
-                return recursiveSchemaToShape(
-                    {
+                return recursiveSchemaToShape({
+                    rawSchema: {
                         ...schema,
                         type: individualType,
                     },
                     keyChain,
-                    definitions,
+                    parentDefinitions: definitions,
                     definitionsShapeCache,
                     rootSchema,
-                );
+                });
             });
 
             return unionShape<any>(...possibleSchemas);

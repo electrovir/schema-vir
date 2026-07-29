@@ -7,11 +7,12 @@ import {
     mapObjectValues,
     type AnyObject,
     type ArrayElement,
+    type IsEqual,
+    type OmitIndexSignature,
     type Values,
 } from '@augment-vir/common';
 import {type JSONSchema} from 'json-schema-to-ts';
 import {assertValidShape} from 'object-shape-tester';
-import {type IsEqual, type OmitIndexSignature} from 'type-fest';
 import {mapSchemaToShape, type SchemaShape, type SchemaShapeOptions} from './map-schema.js';
 import {
     extractSchemaVersion,
