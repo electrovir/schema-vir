@@ -3,6 +3,7 @@ import {describe, it, itCases} from '@augment-vir/test';
 import {type Static} from '@sinclair/typebox';
 import {
     assertValidShape,
+    checkValidShape,
     defineShape,
     exactShape,
     optionalShape,
@@ -1076,6 +1077,142 @@ describe(mapSchemaToShape.name, () => {
             optionalNumberWithDefault?: number | undefined;
             optionalStringWithDefault?: string | undefined;
             optionalMultiTypeWithDefault?: boolean | null | undefined;
+        }>();
+    });
+    it('honors explicit defaults on non-primitive schemas', () => {
+        const schemaShape = mapSchemaToShape({
+            type: 'object',
+            properties: {
+                objectWithDefault: {
+                    type: 'object',
+                    default: {
+                        name: 'from object default',
+                    },
+                    properties: {
+                        name: {
+                            type: 'string',
+                            default: 'from property default',
+                        },
+                    },
+                    required: [
+                        'name',
+                    ],
+                },
+                recordWithDefault: {
+                    type: 'object',
+                    default: {
+                        key: true,
+                    },
+                    additionalProperties: {
+                        type: 'boolean',
+                    },
+                },
+                enumWithDefault: {
+                    enum: [
+                        'first',
+                        'second',
+                    ],
+                    default: 'second',
+                },
+                anyOfWithDefault: {
+                    anyOf: [
+                        {
+                            type: 'string',
+                        },
+                        {
+                            type: 'number',
+                        },
+                    ],
+                    default: 4,
+                },
+                requiredArrayWithDefault: {
+                    type: 'array',
+                    default: [
+                        'a',
+                        'b',
+                    ],
+                    items: {
+                        type: 'string',
+                    },
+                },
+                optionalArrayWithDefault: {
+                    type: 'array',
+                    default: [
+                        1,
+                    ],
+                    items: {
+                        type: 'number',
+                    },
+                },
+            },
+            required: [
+                'objectWithDefault',
+                'recordWithDefault',
+                'enumWithDefault',
+                'anyOfWithDefault',
+                'requiredArrayWithDefault',
+            ],
+        });
+
+        assert.deepEquals(schemaShape.default, {
+            objectWithDefault: {
+                name: 'from object default',
+            },
+            recordWithDefault: {
+                key: true,
+            },
+            enumWithDefault: 'second',
+            anyOfWithDefault: 4,
+            requiredArrayWithDefault: [
+                'a',
+                'b',
+            ],
+            optionalArrayWithDefault: [
+                1,
+            ],
+        });
+        assert.isTrue(
+            checkValidShape(
+                {
+                    ...schemaShape.default,
+                    enumWithDefault: 'first',
+                    requiredArrayWithDefault: [
+                        'c',
+                    ],
+                },
+                schemaShape,
+            ),
+        );
+        assert.isFalse(
+            checkValidShape(
+                {
+                    ...schemaShape.default,
+                    requiredArrayWithDefault: [
+                        1,
+                    ],
+                },
+                schemaShape,
+            ),
+        );
+        assert.isFalse(
+            checkValidShape(
+                {
+                    ...schemaShape.default,
+                    enumWithDefault: 'third',
+                },
+                schemaShape,
+            ),
+        );
+
+        assert.tsType<typeof schemaShape.runtimeType>().equals<{
+            objectWithDefault: {
+                name: string;
+            };
+            recordWithDefault: Record<string, boolean>;
+            enumWithDefault: 'first' | 'second';
+            anyOfWithDefault: string | number;
+            requiredArrayWithDefault: string[];
+            optionalArrayWithDefault?: number[] | undefined;
         }>();
     });
     it('works without required fields', () => {

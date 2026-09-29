@@ -22,6 +22,7 @@ import {
     optionalShape,
     recordShape,
     type Shape,
+    shapeInitToSchema,
     unionShape,
     unknownShape,
 } from 'object-shape-tester';
@@ -272,19 +273,41 @@ function resolveJsonPointer(rootSchema: AnyObject, ref: string): unknown {
     }, rootSchema);
 }
 
-function recursiveSchemaToShape({
-    rawSchema,
-    keyChain,
-    parentDefinitions,
-    definitionsShapeCache,
-    rootSchema,
-}: Readonly<{
+type RecursiveSchemaToShapeParams = Readonly<{
     rawSchema: JSONSchema | ReadonlyArray<JSONSchema>;
     keyChain: ReadonlyArray<string | number>;
     parentDefinitions: AnyObject;
     definitionsShapeCache: AnyObject;
     rootSchema: AnyObject;
-}>): any {
+}>;
+
+/**
+ * Maps a schema node to a shape init, overriding the shape's default with the schema's own
+ * `default` whenever one is given.
+ */
+function recursiveSchemaToShape(params: RecursiveSchemaToShapeParams): any {
+    const shapeInit = schemaToShapeInit(params);
+
+    /**
+     * `object-shape-tester` derives defaults from the shape init itself (`[]` for arrays, property
+     * defaults for objects, the first entry for unions), so an explicit schema `default` has to be
+     * written onto the resulting TypeBox schema.
+     */
+    return check.isObject(params.rawSchema) && 'default' in params.rawSchema
+        ? {
+              ...shapeInitToSchema(shapeInit),
+              default: params.rawSchema.default,
+          }
+        : shapeInit;
+}
+
+function schemaToShapeInit({
+    rawSchema,
+    keyChain,
+    parentDefinitions,
+    definitionsShapeCache,
+    rootSchema,
+}: RecursiveSchemaToShapeParams): any {
     const keyChainString = keyChain.length ? keyChain.join('>') : 'Top level';
 
     const schema = rawSchema as JSONSchema | JSONSchema[];
@@ -427,13 +450,13 @@ function recursiveSchemaToShape({
                 return unionShape(...typedMap(schema.enum, (value) => exactShape(value)));
             }
         } else if (schema.type === 'boolean') {
-            return schema.default ?? false;
+            return false;
         } else if (schema.type === 'integer' || schema.type === 'number') {
-            return schema.default ?? -1;
+            return -1;
         } else if (schema.type === 'null') {
             return null;
         } else if (schema.type === 'string') {
-            return schema.default ?? '';
+            return '';
         } else if (schema.$ref) {
             if (schema.$ref in definitionsShapeCache) {
                 return definitionsShapeCache[schema.$ref];
