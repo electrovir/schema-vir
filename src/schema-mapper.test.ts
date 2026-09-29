@@ -87,14 +87,14 @@ describe(defineSchemaMapperSuite.name, () => {
             ),
             1,
         );
-        assert.throws(() =>
+        assert.throws(() => {
             // @ts-expect-error: intentionally missing required context input
-            mapSchema({
+            return mapSchema({
                 a: {
                     b: 'v1',
                 },
-            }),
-        );
+            });
+        });
     });
 
     it('maps', () => {
@@ -182,10 +182,11 @@ describe(defineSchemaMapperSuite.name, () => {
         const v1Mapper = mockMapperSuite.defineMapper.v1(() => 1);
 
         assert.throws(
-            () =>
-                mockMapperSuite.collectMappers({
+            () => {
+                return mockMapperSuite.collectMappers({
                     v1Mapper,
-                }),
+                });
+            },
             {
                 matchMessage: 'Missing mappers for versions: v2,v3',
             },
@@ -197,13 +198,14 @@ describe(defineSchemaMapperSuite.name, () => {
         const v3Mapper = mockMapperSuite.defineMapper.v3(() => 3);
 
         assert.throws(
-            () =>
-                mockMapperSuite.collectMappers({
+            () => {
+                return mockMapperSuite.collectMappers({
                     v1Mapper,
                     v2Mapper,
                     v3Mapper,
                     v4Mapper: v1Mapper,
-                }),
+                });
+            },
             {
                 matchMessage: "Duplicate mapper for version 'v1' detected at key 'v4Mapper'",
             },

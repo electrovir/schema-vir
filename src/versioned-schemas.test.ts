@@ -120,36 +120,39 @@ describe(defineVersionedSchemaSuite.name, () => {
             '.assertWrapMatch match mismatch',
         );
         assert.throws(
-            () =>
-                mockVersionedSchemaSuite.assertWrapMatch({
+            () => {
+                return mockVersionedSchemaSuite.assertWrapMatch({
                     schemaVersion: 'v99',
                     topProp: {
                         secondProp: {},
                     },
-                }),
+                });
+            },
             {
                 matchMessage: 'data does not match any schemas',
             },
         );
         assert.throws(
-            () =>
-                mockVersionedSchemaSuite.assertWrapMatch({
+            () => {
+                return mockVersionedSchemaSuite.assertWrapMatch({
                     topProp: {
                         secondProp: {},
                     },
-                }),
+                });
+            },
             {
                 matchMessage: 'data does not match any schemas',
             },
         );
         assert.throws(
-            () =>
-                mockVersionedSchemaSuite.assertWrapMatch({
+            () => {
+                return mockVersionedSchemaSuite.assertWrapMatch({
                     schemaVersion: 'v1',
                     topProp: {
                         wrongProp: {},
                     },
-                }),
+                });
+            },
             {
                 matchMessage: 'Shape mismatch',
             },

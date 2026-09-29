@@ -318,8 +318,8 @@ function schemaToShapeInit({
         } else if (check.isArray(schema)) {
             assert.isLengthAtLeast(schema, 1, 'Schema array is empty.');
             return unionShape(
-                ...typedMap(schema, (entry, index) =>
-                    recursiveSchemaToShape({
+                ...typedMap(schema, (entry, index) => {
+                    return recursiveSchemaToShape({
                         rawSchema: entry,
                         keyChain: [
                             ...keyChain,
@@ -328,14 +328,14 @@ function schemaToShapeInit({
                         parentDefinitions,
                         definitionsShapeCache,
                         rootSchema,
-                    }),
-                ),
+                    });
+                }),
             );
         } else if (check.isArray(schema.anyOf)) {
             assert.isLengthAtLeast(schema.anyOf, 1, 'Schema anyOf array is empty.');
             return unionShape(
-                ...typedMap(schema.anyOf, (entry, index) =>
-                    recursiveSchemaToShape({
+                ...typedMap(schema.anyOf, (entry, index) => {
+                    return recursiveSchemaToShape({
                         rawSchema: entry,
                         keyChain: [
                             ...keyChain,
@@ -344,8 +344,8 @@ function schemaToShapeInit({
                         parentDefinitions,
                         definitionsShapeCache,
                         rootSchema,
-                    }),
-                ),
+                    });
+                }),
             );
         }
 

@@ -337,8 +337,8 @@ describe(mapSchemaToShape.name, () => {
             } satisfies typeof withAdditionalProperties.runtimeType,
             withAdditionalProperties,
         );
-        assert.throws(() =>
-            assertValidShape(
+        assert.throws(() => {
+            return assertValidShape(
                 {
                     nested: {
                         a: 'b',
@@ -348,12 +348,12 @@ describe(mapSchemaToShape.name, () => {
                     },
                 },
                 withAdditionalProperties,
-            ),
-        );
+            );
+        });
     });
     it('errors with additional and normal properties', () => {
-        assert.throws(() =>
-            mapSchemaToShape({
+        assert.throws(() => {
+            return mapSchemaToShape({
                 $schema: 'http://json-schema.org/draft-07/schema#',
                 type: 'object',
                 required: [
@@ -373,8 +373,8 @@ describe(mapSchemaToShape.name, () => {
                         },
                     },
                 },
-            }),
-        );
+            });
+        });
     });
 
     it('works on definitions', () => {
@@ -702,8 +702,8 @@ describe(mapSchemaToShape.name, () => {
     });
 
     it('fails on invalid definition', () => {
-        assert.throws(() =>
-            mapSchemaToShape({
+        assert.throws(() => {
+            return mapSchemaToShape({
                 $schema: 'http://json-schema.org/draft-07/schema#',
                 type: 'object',
                 properties: {
@@ -714,8 +714,8 @@ describe(mapSchemaToShape.name, () => {
                         },
                     },
                 },
-            }),
-        );
+            });
+        });
     });
 
     it('resolves a JSON Pointer $ref into another part of the document', () => {
@@ -771,8 +771,8 @@ describe(mapSchemaToShape.name, () => {
             } satisfies typeof withPointer.runtimeType,
             withPointer,
         );
-        assert.throws(() =>
-            assertValidShape(
+        assert.throws(() => {
+            return assertValidShape(
                 {
                     episodes: [],
                     legacyEpisodes: [
@@ -782,8 +782,8 @@ describe(mapSchemaToShape.name, () => {
                     ],
                 },
                 withPointer,
-            ),
-        );
+            );
+        });
     });
 
     it('resolves a legacy #/definitions/ $ref', () => {
@@ -834,8 +834,8 @@ describe(mapSchemaToShape.name, () => {
     });
 
     it('fails on an unresolvable JSON Pointer $ref', () => {
-        assert.throws(() =>
-            mapSchemaToShape({
+        assert.throws(() => {
+            return mapSchemaToShape({
                 $schema: 'http://json-schema.org/draft-07/schema#',
                 type: 'object',
                 properties: {
@@ -846,14 +846,14 @@ describe(mapSchemaToShape.name, () => {
                         },
                     },
                 },
-            }),
-        );
+            });
+        });
     });
 
     it('fails on a non-local (external) $ref', () => {
         assert.throws(
-            () =>
-                mapSchemaToShape({
+            () => {
+                return mapSchemaToShape({
                     $schema: 'http://json-schema.org/draft-07/schema#',
                     type: 'object',
                     properties: {
@@ -864,7 +864,8 @@ describe(mapSchemaToShape.name, () => {
                             },
                         },
                     },
-                }),
+                });
+            },
             {
                 matchMessage: 'No definition found',
             },
@@ -1818,8 +1819,8 @@ describe(`${mapSchemaToShape.name} with a huge schema`, () => {
     });
 
     it('rejects a value that violates a deeply nested enum', () => {
-        assert.throws(() =>
-            assertValidShape(
+        assert.throws(() => {
+            return assertValidShape(
                 {
                     report: {
                         schema_version: 'v1',
@@ -1847,7 +1848,7 @@ describe(`${mapSchemaToShape.name} with a huge schema`, () => {
                     },
                 },
                 hugeShape,
-            ),
-        );
+            );
+        });
     });
 });
